@@ -2,10 +2,10 @@ import React from 'react';
 import Image from 'next/image';
 import Mermaid from 'mermaid';
 
-interface MDXComponentProps {
-  children?: React.ReactNode;
-  className?: string;
-}
+// interface MDXComponentProps {
+//   children?: React.ReactNode;
+//   className?: string;
+// }
 
 interface HeadingProps {
   children: React.ReactNode;
