@@ -1,4 +1,3 @@
-// src/app/posts/[slug]/page.tsx
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
@@ -6,6 +5,7 @@ import { MDXRemote } from 'next-mdx-remote/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
 import TableOfContents from '@/components/TableOfContents';
 import { mdxComponents } from '@/components/mdx-components';
+import type { BundledLanguage, BundledTheme } from 'shiki';
 
 interface Frontmatter {
   title: string;
@@ -13,28 +13,38 @@ interface Frontmatter {
   excerpt: string;
 }
 
+interface VisitedNode {
+  children: Array<{ type: string; value: string }>;
+  properties?: {
+    className?: string[];
+  };
+}
+
 const options = {
   theme: 'catppuccin-mocha',
   keepBackground: true,
-  onVisitLine(node: any) {
+  onVisitLine(node: VisitedNode) {
     if (node.children.length === 0) {
       node.children = [{ type: 'text', value: ' ' }];
     }
   },
-  onVisitHighlightedLine(node: any) {
-    node.properties.className = ['line--highlighted'];
+  onVisitHighlightedLine(node: VisitedNode) {
+    if (node.properties) {
+      node.properties.className = ['line--highlighted'];
+    }
   },
-  onVisitHighlightedWord(node: any) {
-    node.properties.className = ['word--highlighted'];
+  onVisitHighlightedWord(node: VisitedNode) {
+    if (node.properties) {
+      node.properties.className = ['word--highlighted'];
+    }
   },
-  getHighlighter: async (options: any) => {
+  getHighlighter: async () => {
     const { getHighlighter } = await import('shiki');
     return getHighlighter({
-      ...options,
-      theme: options.theme,
+      themes: ['catppuccin-mocha'],
+      langs: ['typescript', 'javascript', 'jsx', 'tsx'] as BundledLanguage[],
     });
   },
-  // Add custom styling
   filterMetaString: (str: string) => str,
   transformMetaString: (str: string) => str,
   customStyle: {
@@ -67,25 +77,21 @@ export async function generateStaticParams() {
 }
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 }
 
-// src/app/posts/[slug]/page.tsx
 export default async function Post({ params }: PageProps) {
-  const resolvedParams = await params;
-  const { frontmatter, content } = await getPost(resolvedParams.slug);
+  const { frontmatter, content } = await getPost(params.slug);
 
   return (
-    <div className="min-h-screen bg-base pt-16"> {/* Added pt-16 for navbar height */}
+    <div className="min-h-screen bg-base pt-16">
       <div className="flex justify-between">
-        {/* TOC Sidebar - adjusted top position */}
         <div className="hidden lg:block w-64 fixed left-0 top-16 h-[calc(100vh-4rem)] overflow-y-auto bg-mantle border-r border-surface0">
           <div className="px-4 py-6">
             <TableOfContents content={content} />
           </div>
         </div>
 
-        {/* Main Content */}
         <article className="flex-1 max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-12 py-12 lg:ml-64">
           <header className="mb-8">
             <h1 className="text-4xl font-bold text-text mb-2">
@@ -127,7 +133,6 @@ export default async function Post({ params }: PageProps) {
           </div>
         </article>
 
-        {/* Spacer for layout balance */}
         <div className="hidden lg:block w-64 shrink-0" />
       </div>
     </div>

@@ -1,6 +1,4 @@
-// src/components/MdxImage.tsx
 import Image from 'next/image';
-import path from 'path';
 
 interface MdxImageProps {
   src: string;
@@ -21,7 +19,6 @@ const MdxImage = ({ src, alt = '', className = '' }: MdxImageProps) => {
   };
 
   const imagePath = getImagePath(src);
-
   return (
     <div className="relative w-full h-[400px] my-8">
       <Image
