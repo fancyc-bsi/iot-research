@@ -3,7 +3,11 @@
 import React from 'react';
 import mermaid from 'mermaid';
 
-export default function MermaidDiagram({ content }: { content: string }) {
+interface MermaidDiagramProps {
+  content: string;
+}
+
+export default function MermaidDiagram({ content }: MermaidDiagramProps) {
   const [svg, setSvg] = React.useState<string>('');
   const [error, setError] = React.useState<string | null>(null);
   const elementId = React.useId();
