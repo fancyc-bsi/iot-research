@@ -2,20 +2,10 @@ import React from 'react';
 import Image from 'next/image';
 import Mermaid from 'mermaid';
 
-// Define component prop interfaces
 interface MDXComponentProps {
   children?: React.ReactNode;
   className?: string;
 }
-
-// type MDXComponents = {
-//   h1: React.FC<MDXComponentProps>;
-//   h2: React.FC<MDXComponentProps>;
-//   h3: React.FC<MDXComponentProps>;
-//   p: React.FC<MDXComponentProps>;
-//   pre: React.FC<MDXComponentProps>;
-//   code: React.FC<MDXComponentProps>;
-// }
 
 interface HeadingProps {
   children: React.ReactNode;
@@ -27,6 +17,11 @@ interface ParagraphProps {
 
 interface PreProps {
   children: React.ReactElement & { props: { className?: string; children: string } };
+}
+
+interface CodeProps {
+  children?: string;
+  className?: string;
 }
 
 const slugify = (str: string) =>
@@ -63,20 +58,34 @@ const ImageContainer = ({ children }: { children: React.ReactNode }) => {
 
 const MermaidDiagram = ({ content }: { content: string }) => {
   const [svg, setSvg] = React.useState<string>('');
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    Mermaid.initialize({
-      startOnLoad: true,
-      theme: 'dark',
-      securityLevel: 'loose',
-    });
+    const renderDiagram = async () => {
+      try {
+        await Mermaid.initialize({
+          startOnLoad: true,
+          theme: 'dark',
+          securityLevel: 'loose',
+        });
 
-    Mermaid.render('mermaid-svg', content)
-      .then(({ svg }) => {
+        const { svg } = await Mermaid.render('mermaid-svg-' + Math.random(), content);
         setSvg(svg);
-      })
-      .catch(console.error);
+        setError(null);
+      } catch (err) {
+        console.error('Mermaid rendering error:', err);
+        setError(err instanceof Error ? err.message : 'Error rendering diagram');
+      }
+    };
+
+    if (content) {
+      renderDiagram();
+    }
   }, [content]);
+
+  if (error) {
+    return <div className="text-red-500">Error rendering diagram: {error}</div>;
+  }
 
   return (
     <div 
@@ -144,7 +153,7 @@ export const mdxComponents = {
       React.isValidElement(children) &&
       children.props?.className?.includes('language-mermaid')
     ) {
-      return <MermaidDiagram content={children.props.children as string} />;
+      return <MermaidDiagram content={children.props.children} />;
     }
 
     return (
@@ -153,15 +162,15 @@ export const mdxComponents = {
       </pre>
     );
   },
-  code: (props: MDXComponentProps) => {
-    if (props.className === 'language-mermaid') {
-      return <MermaidDiagram content={props.children as string} />;
+  code: ({ children, className }: CodeProps) => {
+    if (className === 'language-mermaid') {
+      return <MermaidDiagram content={children || ''} />;
     }
   
     return (
       <code className="bg-gray-800 px-1 py-0.5 rounded text-sm whitespace-pre-wrap">
-        {props.children}
+        {children}
       </code>
     );
-  },  
+  },
 };
