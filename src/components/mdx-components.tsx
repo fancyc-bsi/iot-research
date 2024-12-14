@@ -9,6 +9,16 @@ import mermaid from 'mermaid';
 import TableOfContents from '@/components/TableOfContents';
 import type { BundledLanguage } from 'shiki';
 
+import dynamic from 'next/dynamic';
+
+const MermaidDiagram = dynamic(() => import('./MermaidDiagram'), {
+  ssr: false,
+  loading: () => (
+    <div className="my-8 p-6 bg-base rounded-lg border border-surface0 shadow-lg">
+      Loading diagram...
+    </div>
+  ),
+});
 
 // Types
 interface Frontmatter {
@@ -100,93 +110,6 @@ const ImageContainer = ({ children }: { children: React.ReactNode }) => (
     {children}
   </div>
 );
-
-const MermaidDiagram = ({ content }: { content: string }) => {
-  const [svg, setSvg] = React.useState<string>('');
-  const [error, setError] = React.useState<string | null>(null);
-  const elementId = React.useId();
-
-  React.useEffect(() => {
-    const initializeMermaid = async () => {
-      try {
-        await mermaid.initialize({
-          startOnLoad: true,
-          theme: 'dark',
-          themeVariables: {
-            primaryColor: '#cdd6f4',
-            primaryTextColor: '#cdd6f4',
-            primaryBorderColor: '#45475a',
-            lineColor: '#45475a',
-            secondaryColor: '#1e1e2e',
-            tertiaryColor: '#181825',
-            background: '#1e1e2e',
-            nodeBorder: '#45475a',
-            edgeLabelBackground: '#181825',
-            clusterBkg: '#1e1e2e',
-            clusterBorder: '#45475a',
-            labelBoxBkgColor: '#1e1e2e',
-            labelBoxBorderColor: '#45475a',
-            labelTextColor: '#cdd6f4',
-          },
-          flowchart: {
-            htmlLabels: true,
-            curve: 'basis',
-            padding: 20,
-            nodeSpacing: 50,
-            rankSpacing: 50,
-          },
-          securityLevel: 'loose',
-        });
-      } catch (error) {
-        console.error('Mermaid initialization error:', error);
-      }
-    };
-
-    initializeMermaid();
-  }, []);
-
-  React.useEffect(() => {
-    const renderDiagram = async () => {
-      if (!content) return;
-
-      try {
-        // Clear any previous content
-        const element = document.getElementById(elementId);
-        if (element) {
-          element.innerHTML = content;
-        }
-
-        // Render new diagram
-        const { svg } = await mermaid.render(elementId, content);
-        setSvg(svg);
-        setError(null);
-      } catch (err) {
-        console.error('Mermaid rendering error:', err);
-        setError(err instanceof Error ? err.message : 'Error rendering diagram');
-      }
-    };
-
-    renderDiagram();
-  }, [content, elementId]);
-
-  if (error) {
-    return (
-      <div className="p-4 my-4 bg-red-900/20 border border-red-500 rounded-lg text-red-500">
-        Error rendering diagram: {error}
-      </div>
-    );
-  }
-
-  return (
-    <div className="my-8 p-6 bg-base rounded-lg border border-surface0 shadow-lg overflow-x-auto">
-      <div id={elementId} style={{ display: 'none' }} />
-      <div
-        className="mermaid-diagram"
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
-    </div>
-  );
-};
 
 export const mdxComponents = {
   h1: ({ children }: HeadingProps) => {

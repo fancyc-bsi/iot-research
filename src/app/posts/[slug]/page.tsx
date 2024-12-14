@@ -20,7 +20,7 @@ interface VisitedNode {
   };
 }
 
-const options = {
+const rehypeOptions = {
   theme: 'catppuccin-mocha',
   keepBackground: true,
   onVisitLine(node: VisitedNode) {
@@ -131,7 +131,7 @@ export default async function Post({ params }: Props) {
                 mdxOptions: {
                   remarkPlugins: [],
                   rehypePlugins: [
-                    [rehypePrettyCode, options]
+                    [rehypePrettyCode, rehypeOptions]
                   ],
                   format: 'mdx'
                 }
