@@ -7,27 +7,26 @@ interface MdxImageProps {
 }
 
 const MdxImage = ({ src, alt = '', className = '' }: MdxImageProps) => {
-  // Handle Obsidian-style image paths
   const getImagePath = (src: string) => {
     // Handle ![[Pasted image YYYYMMDDHHMMSS.png]] format
     const obsidianMatch = src.match(/!\[\[Pasted image (\d{14})\.png\]\]/);
     if (obsidianMatch) {
-      return `/images/posts/geeni-glimpse/image_${obsidianMatch[1]}.png`;
+      return `/iot-research/images/posts/geeni-glimpse/Pasted image ${obsidianMatch[1]}.png`;
     }
 
     // Handle regular markdown ![alt](path) format
     const markdownMatch = src.match(/!\[(.*?)\]\((.*?)\)/);
     if (markdownMatch) {
-      return markdownMatch[2];
+      return `/iot-research${markdownMatch[2]}`;
     }
 
     // If the path is already clean, just use it
     if (src.startsWith('/') || src.startsWith('./') || src.startsWith('http')) {
-      return src;
+      return src.startsWith('/') ? `/iot-research${src}` : src;
     }
 
     // For any other format, assume it's a direct path in the public/images folder
-    return `/images/${src}`;
+    return `/iot-research/images/${src}`;
   };
 
   const imagePath = getImagePath(src);
