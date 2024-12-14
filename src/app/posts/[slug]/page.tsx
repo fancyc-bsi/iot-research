@@ -7,8 +7,6 @@ import TableOfContents from '@/components/TableOfContents';
 import { mdxComponents } from '@/components/mdx-components';
 import type { BundledLanguage } from 'shiki';
 
-import { Metadata } from 'next';
-
 interface Frontmatter {
   title: string;
   date: string;
