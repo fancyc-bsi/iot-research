@@ -82,11 +82,13 @@ type Props = {
   params: Promise<{
     slug: string;
   }>;
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
+
 
 export default async function Post({ params }: Props) {
   const resolvedParams = await params;
+  // const resolvedSearchParams = await searchParams;
   const { frontmatter, content } = await getPost(resolvedParams.slug);
 
   return (
