@@ -8,6 +8,8 @@ import Image from 'next/image';
 import mermaid from 'mermaid';
 import TableOfContents from '@/components/TableOfContents';
 import type { BundledLanguage } from 'shiki';
+import dynamic from 'next/dynamic';
+
 
 // Types
 interface Frontmatter {
