@@ -5,7 +5,6 @@ import { MDXRemote } from 'next-mdx-remote/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
 import React from 'react';
 import Image from 'next/image';
-import mermaid from 'mermaid';
 import TableOfContents from '@/components/TableOfContents';
 import type { BundledLanguage } from 'shiki';
 
@@ -32,14 +31,6 @@ interface ParagraphProps {
   children: React.ReactNode | React.ReactNode[];
 }
 
-interface PreProps {
-  children: React.ReactElement & { props: { className?: string; children: string } };
-}
-
-interface CodeProps {
-  children?: string;
-  className?: string;
-}
 
 // Utility Functions
 const slugify = (str: string) =>
@@ -71,7 +62,7 @@ const rehypeOptions = {
     const { getHighlighter } = await import('shiki');
     return getHighlighter({
       themes: ['catppuccin-mocha'],
-      langs: ['typescript', 'javascript', 'jsx', 'tsx', 'mermaid'] as BundledLanguage[],
+      langs: ['typescript', 'javascript', 'jsx', 'tsx', ] as BundledLanguage[],
     });
   },
 };
