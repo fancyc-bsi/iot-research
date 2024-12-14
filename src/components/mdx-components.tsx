@@ -9,16 +9,6 @@ import mermaid from 'mermaid';
 import TableOfContents from '@/components/TableOfContents';
 import type { BundledLanguage } from 'shiki';
 
-import dynamic from 'next/dynamic';
-
-const MermaidDiagram = dynamic(() => import('./MermaidDiagram'), {
-  ssr: false,
-  loading: () => (
-    <div className="my-8 p-6 bg-base rounded-lg border border-surface0 shadow-lg">
-      Loading diagram...
-    </div>
-  ),
-});
 
 // Types
 interface Frontmatter {
@@ -163,31 +153,6 @@ export const mdxComponents = {
     }
 
     return <p className="my-4 leading-relaxed">{children}</p>;
-  },
-  pre: ({ children }: PreProps) => {
-    if (
-      React.isValidElement(children) &&
-      children.props?.className?.includes('language-mermaid')
-    ) {
-      return <MermaidDiagram content={children.props.children.trim()} />;
-    }
-
-    return (
-      <pre className="bg-gray-800 p-4 rounded-lg overflow-x-auto my-4">
-        {children}
-      </pre>
-    );
-  },
-  code: ({ children, className }: CodeProps) => {
-    if (className === 'language-mermaid') {
-      return <MermaidDiagram content={children?.trim() || ''} />;
-    }
-  
-    return (
-      <code className="bg-gray-800 px-1.5 py-0.5 rounded text-sm">
-        {children}
-      </code>
-    );
   },
 };
 
