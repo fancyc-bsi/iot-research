@@ -1,6 +1,27 @@
+import fs from 'fs';
+import path from 'path';
+import matter from 'gray-matter';
+import { MDXRemote } from 'next-mdx-remote/rsc';
+import rehypePrettyCode from 'rehype-pretty-code';
 import React from 'react';
 import Image from 'next/image';
 import mermaid from 'mermaid';
+import TableOfContents from '@/components/TableOfContents';
+import type { BundledLanguage } from 'shiki';
+
+// Types
+interface Frontmatter {
+  title: string;
+  date: string;
+  excerpt: string;
+}
+
+interface VisitedNode {
+  children: Array<{ type: string; value: string }>;
+  properties?: {
+    className?: string[];
+  };
+}
 
 interface HeadingProps {
   children: React.ReactNode;
@@ -19,12 +40,42 @@ interface CodeProps {
   className?: string;
 }
 
+// Utility Functions
 const slugify = (str: string) =>
   str
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
+// Rehype Pretty Code Options
+const rehypeOptions = {
+  theme: 'catppuccin-mocha',
+  keepBackground: true,
+  onVisitLine(node: VisitedNode) {
+    if (node.children.length === 0) {
+      node.children = [{ type: 'text', value: ' ' }];
+    }
+  },
+  onVisitHighlightedLine(node: VisitedNode) {
+    if (node.properties) {
+      node.properties.className = ['line--highlighted'];
+    }
+  },
+  onVisitHighlightedWord(node: VisitedNode) {
+    if (node.properties) {
+      node.properties.className = ['word--highlighted'];
+    }
+  },
+  getHighlighter: async () => {
+    const { getHighlighter } = await import('shiki');
+    return getHighlighter({
+      themes: ['catppuccin-mocha'],
+      langs: ['typescript', 'javascript', 'jsx', 'tsx', 'mermaid'] as BundledLanguage[],
+    });
+  },
+};
+
+// MDX Components
 const ObsidianImage = ({ content }: { content: string }) => {
   const imageName = content.replace(/!\[\[(.*?)\]\]/, '$1');
   const imagePath = `/iot-research/images/posts/geeni-glimpse/${imageName}`;
@@ -52,54 +103,61 @@ const ImageContainer = ({ children }: { children: React.ReactNode }) => (
 const MermaidDiagram = ({ content }: { content: string }) => {
   const [svg, setSvg] = React.useState<string>('');
   const [error, setError] = React.useState<string | null>(null);
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const diagramId = React.useId();
+  const elementId = React.useId();
 
   React.useEffect(() => {
-    // Initialize mermaid only once when component mounts
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'dark',
-      securityLevel: 'loose',
-      flowchart: {
-        curve: 'basis',
-        padding: 20,
-        nodeSpacing: 50,
-        rankSpacing: 50,
-      },
-      themeVariables: {
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        fontSize: '16px',
-        primaryColor: '#1e1e2e',
-        primaryTextColor: '#cdd6f4',
-        primaryBorderColor: '#45475a',
-        lineColor: '#45475a',
-        secondaryColor: '#181825',
-        tertiaryColor: '#1e1e2e'
+    const initializeMermaid = async () => {
+      try {
+        await mermaid.initialize({
+          startOnLoad: true,
+          theme: 'dark',
+          themeVariables: {
+            primaryColor: '#cdd6f4',
+            primaryTextColor: '#cdd6f4',
+            primaryBorderColor: '#45475a',
+            lineColor: '#45475a',
+            secondaryColor: '#1e1e2e',
+            tertiaryColor: '#181825',
+            background: '#1e1e2e',
+            nodeBorder: '#45475a',
+            edgeLabelBackground: '#181825',
+            clusterBkg: '#1e1e2e',
+            clusterBorder: '#45475a',
+            labelBoxBkgColor: '#1e1e2e',
+            labelBoxBorderColor: '#45475a',
+            labelTextColor: '#cdd6f4',
+          },
+          flowchart: {
+            htmlLabels: true,
+            curve: 'basis',
+            padding: 20,
+            nodeSpacing: 50,
+            rankSpacing: 50,
+          },
+          securityLevel: 'loose',
+        });
+      } catch (error) {
+        console.error('Mermaid initialization error:', error);
       }
-    });
+    };
 
+    initializeMermaid();
+  }, []);
+
+  React.useEffect(() => {
     const renderDiagram = async () => {
-      if (!content || !containerRef.current) return;
+      if (!content) return;
 
       try {
-        // Clear previous content
-        containerRef.current.innerHTML = '';
-        
-        // Generate new SVG
-        const { svg } = await mermaid.render(`mermaid-${diagramId}`, content.trim());
-        
-        // Set the SVG content
-        containerRef.current.innerHTML = svg;
-        
-        // Post-process the SVG to apply additional styles
-        const svgElement = containerRef.current.querySelector('svg');
-        if (svgElement) {
-          svgElement.style.maxWidth = '100%';
-          svgElement.style.height = 'auto';
-          // Add more SVG styles as needed
+        // Clear any previous content
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.innerHTML = content;
         }
-        
+
+        // Render new diagram
+        const { svg } = await mermaid.render(elementId, content);
+        setSvg(svg);
         setError(null);
       } catch (err) {
         console.error('Mermaid rendering error:', err);
@@ -108,7 +166,7 @@ const MermaidDiagram = ({ content }: { content: string }) => {
     };
 
     renderDiagram();
-  }, [content, diagramId]);
+  }, [content, elementId]);
 
   if (error) {
     return (
@@ -119,10 +177,13 @@ const MermaidDiagram = ({ content }: { content: string }) => {
   }
 
   return (
-    <div 
-      ref={containerRef}
-      className="my-4 p-4 bg-base rounded-lg overflow-x-auto"
-    />
+    <div className="my-8 p-6 bg-base rounded-lg border border-surface0 shadow-lg overflow-x-auto">
+      <div id={elementId} style={{ display: 'none' }} />
+      <div
+        className="mermaid-diagram"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    </div>
   );
 };
 
@@ -180,24 +241,22 @@ export const mdxComponents = {
     return <p className="my-4 leading-relaxed">{children}</p>;
   },
   pre: ({ children }: PreProps) => {
-    // Check if it's a mermaid diagram
     if (
       React.isValidElement(children) &&
       children.props?.className?.includes('language-mermaid')
     ) {
-      return <MermaidDiagram content={children.props.children} />;
+      return <MermaidDiagram content={children.props.children.trim()} />;
     }
 
-    // Regular pre block
     return (
-      <pre className="bg-mantle p-4 rounded-lg overflow-x-auto my-4 border border-surface0">
+      <pre className="bg-gray-800 p-4 rounded-lg overflow-x-auto my-4">
         {children}
       </pre>
     );
   },
   code: ({ children, className }: CodeProps) => {
     if (className === 'language-mermaid') {
-      return <MermaidDiagram content={children || ''} />;
+      return <MermaidDiagram content={children?.trim() || ''} />;
     }
   
     return (
@@ -207,3 +266,91 @@ export const mdxComponents = {
     );
   },
 };
+
+// Post Fetching Functions
+async function getPost(slug: string) {
+  const markdownFile = fs.readFileSync(
+    path.join(process.cwd(), 'src/content/posts', slug + '.mdx'),
+    'utf-8'
+  );
+  const { data: frontmatter, content } = matter(markdownFile);
+  return {
+    frontmatter: frontmatter as Frontmatter,
+    content,
+  };
+}
+
+export async function generateStaticParams() {
+  const files = fs.readdirSync(path.join(process.cwd(), 'src/content/posts'));
+  return files.map((filename) => ({
+    slug: filename.replace('.mdx', ''),
+  }));
+}
+
+// Main Post Component
+type Props = {
+  params: Promise<{
+    slug: string;
+  }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+export default async function Post({ params }: Props) {
+  const resolvedParams = await params;
+  const { frontmatter, content } = await getPost(resolvedParams.slug);
+
+  return (
+    <div className="min-h-screen bg-base pt-16">
+      <div className="flex justify-between">
+        <div className="hidden lg:block w-64 fixed left-0 top-16 h-[calc(100vh-4rem)] overflow-y-auto bg-mantle border-r border-surface0">
+          <div className="px-4 py-6">
+            <TableOfContents content={content} />
+          </div>
+        </div>
+
+        <article className="flex-1 max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-12 py-12 lg:ml-64">
+          <header className="mb-8">
+            <h1 className="text-4xl font-bold text-text mb-2">
+              {frontmatter.title}
+            </h1>
+            <time className="text-subtext0">
+              {new Date(frontmatter.date).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </time>
+          </header>
+
+          <div className="prose prose-invert prose-lg max-w-none 
+            prose-headings:text-text 
+            prose-p:text-subtext0 
+            prose-a:text-blue hover:prose-a:text-sapphire
+            prose-strong:text-mauve
+            prose-code:text-peach
+            [&>pre]:!bg-mantle
+            [&>pre]:border
+            [&>pre]:border-surface0
+            [&>pre]:rounded-lg
+            [&>pre]:shadow-lg">
+            <MDXRemote
+              source={content}
+              options={{
+                mdxOptions: {
+                  remarkPlugins: [],
+                  rehypePlugins: [
+                    [rehypePrettyCode, rehypeOptions]
+                  ],
+                  format: 'mdx'
+                }
+              }}
+              components={mdxComponents}
+            />
+          </div>
+        </article>
+
+        <div className="hidden lg:block w-64 shrink-0" />
+      </div>
+    </div>
+  );
+}
