@@ -76,11 +76,14 @@ export async function generateStaticParams() {
   }));
 }
 
-interface PageProps {
-  params: { slug: string };
-}
+type Props = {
+  params: {
+    slug: string;
+  };
+  searchParams: { [key: string]: string | string[] | undefined };
+};
 
-export default async function Post({ params }: PageProps) {
+export default async function Post({ params, searchParams }: Props) {
   const { frontmatter, content } = await getPost(params.slug);
 
   return (
