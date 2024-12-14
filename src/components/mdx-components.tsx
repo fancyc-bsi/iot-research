@@ -1,11 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
-import Mermaid from 'mermaid';
-
-// interface MDXComponentProps {
-//   children?: React.ReactNode;
-//   className?: string;
-// }
+import mermaid from 'mermaid';
 
 interface HeadingProps {
   children: React.ReactNode;
@@ -35,7 +30,7 @@ const ObsidianImage = ({ content }: { content: string }) => {
   const imagePath = `/iot-research/images/posts/geeni-glimpse/${imageName}`;
   
   return (
-    <div className="relative w-full h-[400px] my-4">
+    <div className="relative w-full h-[300px] my-2">
       <Image
         src={imagePath}
         alt={imageName}
@@ -48,28 +43,39 @@ const ObsidianImage = ({ content }: { content: string }) => {
   );
 };
 
-const ImageContainer = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <div className="flex flex-col gap-4">
-      {children}
-    </div>
-  );
-};
+const ImageContainer = ({ children }: { children: React.ReactNode }) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
+    {children}
+  </div>
+);
 
 const MermaidDiagram = ({ content }: { content: string }) => {
   const [svg, setSvg] = React.useState<string>('');
   const [error, setError] = React.useState<string | null>(null);
+  const diagramId = React.useId();
 
   React.useEffect(() => {
     const renderDiagram = async () => {
       try {
-        await Mermaid.initialize({
-          startOnLoad: true,
+        // Initialize mermaid with custom config
+        mermaid.initialize({
+          startOnLoad: false,
           theme: 'dark',
           securityLevel: 'loose',
+          flowchart: {
+            curve: 'basis',
+            padding: 20
+          },
+          themeVariables: {
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            fontSize: '16px',
+            lineColor: '#666',
+            mainBkg: '#1a1a1a',
+            textColor: '#fff'
+          }
         });
 
-        const { svg } = await Mermaid.render('mermaid-svg-' + Math.random(), content);
+        const { svg } = await mermaid.render(`mermaid-${diagramId}`, content);
         setSvg(svg);
         setError(null);
       } catch (err) {
@@ -81,15 +87,19 @@ const MermaidDiagram = ({ content }: { content: string }) => {
     if (content) {
       renderDiagram();
     }
-  }, [content]);
+  }, [content, diagramId]);
 
   if (error) {
-    return <div className="text-red-500">Error rendering diagram: {error}</div>;
+    return (
+      <div className="p-4 my-4 bg-red-900/20 border border-red-500 rounded-lg text-red-500">
+        Error rendering diagram: {error}
+      </div>
+    );
   }
 
   return (
     <div 
-      className="my-8 overflow-x-auto"
+      className="my-4 p-4 bg-gray-900/50 rounded-lg overflow-x-auto"
       dangerouslySetInnerHTML={{ __html: svg }} 
     />
   );
@@ -157,7 +167,7 @@ export const mdxComponents = {
     }
 
     return (
-      <pre className="bg-gray-800 p-4 rounded-lg overflow-x-auto my-4 w-full">
+      <pre className="bg-gray-800 p-4 rounded-lg overflow-x-auto my-4">
         {children}
       </pre>
     );
@@ -168,7 +178,7 @@ export const mdxComponents = {
     }
   
     return (
-      <code className="bg-gray-800 px-1 py-0.5 rounded text-sm whitespace-pre-wrap">
+      <code className="bg-gray-800 px-1.5 py-0.5 rounded text-sm">
         {children}
       </code>
     );
