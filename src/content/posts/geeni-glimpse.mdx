@@ -1,0 +1,822 @@
+---
+title: 'Geeni Glimpse Security Analysis'
+date: '2024-12-12'
+excerpt: 'A detailed security analysis of the Geeni Glimpse IoT camera'
+---
+
+# Introduction 
+
+This walkthrough will contain a breakdown of my methodoligy and approach for hardware hacking.
+I'll discuss my process for the following main areas: 
+- Visual inspection and component identification
+- UART transmission analysis
+- firmware extraction/modification
+- Obtaining a root shell
+- Reviewing network communications from/to the device 
+- Inspecting open ports
+- Review cloud server traffic 
+- Attempt to reverse engineer critical binaries
+- Bypass SSL pinning or integrity checks on the mobile app to view cleartext traffic
+
+The original purpose for this research was to actually fix my camera that would simply not pair. I tried all of the troubleshooting steps and eventually chose to just take the device apart.
+
+Upon doing so, I noticed some very clearly labled "RX" and "TX" pads, indicating UART which will allow us to obtain a serial console on the device.
+
+Our inital shell is blocked by a login prompt, but we are able to bypass this with some firmware modifications. 
+
+I managed to successfully obtain a root shell on the device, bypass the android application SSL pinning and finally, properly pair the device.
+
+---
+
+# Logic analyzer
+
+![[Pasted image 20241206103431.png]]
+
+![[Pasted image 20241206103450.png]]
+
+![[Pasted image 20241206104541.png]]
+
+![[Pasted image 20241206111615.png]]
+
+![[Pasted image 20241206111749.png]]
+
+---
+
+# Firmware Extraction and Modification
+
+I performed a "Chip off" firmware extraction for this device, meaning I physically removed the flash chip with hot air.
+
+Analysis was then conducted on the firmware using binwalk and a personally devloped tool for directory crawling of IOT firmware.
+    
+- https://github.com/fancyc-bsi/tox/blob/main/tox.py
+
+## Method 1: DTB Modification
+
+> Note: This approach was attempted but did not yield successful results.
+
+![[Pasted image 20241204110345.png]]
+
+During the uboot process, we interupt the device from completing the initalization. This will let us print evrioment variables and other useful info.
+
+### Modified Approach
+
+1. **Extract the Device Tree Blob (DTB)**
+   ```bash
+   dd if=firmware-original.bin of=original_dtb.bin bs=1 skip=212992 count=45056
+   ```
+
+2. **Convert DTB to readable format**
+   ```bash
+   dtc -I dtb -O dts -o original.dts original_dtb.bin
+   ```
+
+3. **Make modifications**
+   - Edit `original.dts`
+   - Change `init=/sbin/init` to `init=/bin/sh`
+
+4. **Convert back to DTB**
+   ```bash
+   dtc -I dts -O dtb -o modified_dtb.bin original.dts
+   ```
+> 💡 **Important Note**: The DTB modification must stay within the 45056 byte limit to maintain firmware integrity.
+
+5. **Create modified firmware**
+   ```bash
+   cp firmware-original.bin modded_firmware.bin
+   dd if=modified_dtb.bin of=modded_firmware.bin bs=1 seek=212992 conv=notrunc
+   ```
+
+### Confirmation
+We extract the firmware again and grep for the changes we just made.
+
+![[Pasted image 20241204134108.png]]
+
+6. **Flash the modified firmware**
+   ```bash
+   minipro -p 'XM25QH64C@SOIC8' -w modded_firmware.bin
+   ```
+
+### Why didn't this work?
+Due to the inittab being responsible for the inital entrypoint, our modifications were never being touched.
+
+In the next session I'll discuss the method that actually worked and how.
+
+
+## Method 2: Modifying inittab
+
+### Initial Analysis
+Let's examine the filesystem. Here's what we find in `/etc/inittab`:
+
+```sh
+# /etc/inittab
+# Copyright (C) 2010 Anyka
+# Note: BusyBox init doesn't support runlevels. The runlevels field is
+# completely ignored by BusyBox init. If you want runlevels, use
+# sysvinit.
+#
+# Format for each entry: <id>:<runlevels>:<action>:<process>
+#
+# id == tty to run on, or empty for /dev/console
+# runlevels == ignored
+# action == one of sysinit, respawn, askfirst, wait, and once
+# process == program to run
+
+# Startup the system
+::sysinit:/etc/init.d/rcS
+ttySAK0::respawn:/sbin/getty -L ttySAK0 115200 vt100 # GENERIC_SERIAL
+::restart:/sbin/init
+::ctrlaltdel:/sbin/reboot
+::shutdown:/bin/umount -a -r
+::shutdown:/sbin/swapoff -a
+```
+
+### Making Modifications
+We'll modify the inittab file to drop us into a root shell instead of getty. Here's the modified version:
+
+```sh
+# Modified /etc/inittab
+::sysinit:/etc/init.d/rcS
+#ttySAK0::respawn:/sbin/getty -L ttySAK0 115200 vt100 # GENERIC_SERIAL
+ttySAK0::respawn:/bin/sh
+::restart:/sbin/init
+::ctrlaltdel:/sbin/reboot
+::shutdown:/bin/umount -a -r
+::shutdown:/sbin/swapoff -a
+```
+
+### Step-by-Step Process
+
+1. **Extract the SquashFS filesystem**
+   ```sh
+   # Extract at offset 1847296 (0x1C3000)
+   dd if=firmware-original.bin of=rootfs.squashfs bs=1 skip=1847296 count=1929608
+   ```
+
+2. **Unpack the filesystem**
+   ```sh
+   unsquashfs rootfs.squashfs && cd squashfs-root
+   ```
+
+3. **Modify the configuration**
+   ```sh
+   nano etc/inittab
+   ```
+
+4. **Create new SquashFS**
+   ```sh
+   cd .. && mksquashfs squashfs-root new_rootfs.squashfs -comp xz -b 131072 -noappend
+   ```
+
+5. **Create modified firmware**
+   ```sh
+   cp firmware-original.bin modded_firmware.bin && \
+   dd if=new_rootfs.squashfs of=modded_firmware.bin bs=1 seek=1847296 conv=notrunc
+   ```
+
+6. **Flash the modified firmware**
+   ```sh
+   minipro -p 'XM25QH64C@SOIC8' -w modded_firmware.bin
+   ```
+
+---
+
+# Obtaining Root
+After flashing our new firmware back onto the device, we solder the chip back on. 
+
+Then, we attach our pogo pins to the "TX" and "RX" pads on the device, start picocom and hope our modification was successful.
+
+```sh
+picocom -b 115200 /dev/ttyUSB0 
+```
+> -b is for baud rate, 115200 is the most common one so was tried first.
+
+![[Pasted image 20241204210444.png]]
+
+!!TODO => replace with link
+## Filter Script 
+
+After obtaining a root shell on the device, the terminal was extremely crowded with log messages.
+I created a script to filter out the noise and allow me to focus on the directory structure more clearly.
+
+![[Pasted image 20241205145908.png]]
+
+![[Pasted image 20241207162543.png]]
+
+---
+
+# Fixing the camera
+
+```bash
+ps aux --> search for : anyka_service.sh and anyka_ipc
+```
+
+kill the bash script first, otherwise it will just perform like watchdog and reboot the service 
+```bash
+kill -9 419  # anyka_service.sh
+kill -9 549  # anyka_ipc
+```
+
+```bash
+iwconfig wlan0 # make sure the the device is in managed mode  
+
+ip link set wlan0 down
+iwconfig wlan0 mode managed
+ip link set wlan0 up
+```
+
+after browsing the firmware and reading the bash scripts, it seems like there is already a utility for wifi connections, if this doesnt work we will try the actual wpa_cli.
+
+```sh
+/usr/sbin/wifi_connect.sh "starship" "mypassword"
+```
+
+now it is connected to the wifi :) 
+
+![[Pasted image 20241207170809.png]]
+
+now we can nmap the host and connect via telnet:
+
+![[Pasted image 20241207170945.png]]
+
+we could not crack the root password - so we simply change the root password on the device to '123' via the 'passwd' command:
+
+![[Pasted image 20241207171114.png]]
+
+
+![[Pasted image 20241207171101.png]]
+
+
+## Running services 
+
+![[Pasted image 20241205160458.png]]
+
+telnet and anyka service 
+
+
+![[Pasted image 20241205160939.png]]
+
+strings output of ipc
+
+
+
+## Setup of the wifi
+![[Pasted image 20241205162033.png]]
+
+---
+
+# Auto exploit for telnet shell 
+![[Pasted image 20241208100259.png]]
+
+!!TODO => convert to github link
+
+
+
+![[Pasted image 20241208110051.png]]
+
+---
+
+# Reverse Engineering the "anyka_ipc" Binary 
+
+![[Pasted image 20241207172708.png]]
+
+![[Pasted image 20241207172905.png]]
+
+
+
+![[Pasted image 20241207191257.png]]
+
+
+
+![[Pasted image 20241207191417.png]]
+
+
+
+![[Pasted image 20241207191831.png]]
+
+modifying /tmp/wifi_info.ini
+
+![[Pasted image 20241207193809.png]]
+
+
+![[Pasted image 20241207195301.png]]
+
+
+![[Pasted image 20241207234310.png]]
+
+
+
+![[Pasted image 20241207215726.png]]
+
+
+
+![[Pasted image 20241208110807.png]]
+
+
+## Decent to madness
+
+![[Pasted image 20241208223726.png]]
+
+
+![[Pasted image 20241208223757.png]]
+
+
+![[Pasted image 20241209132852.png]]
+
+
+![[Pasted image 20241210093344.png]]
+
+```sh
+sort_rev_data: 0x00d2 0x0080 0x010a 0x016d 0x0179 0x0170
+sort_rev_data: 0x00c1 0x0081 0x0161 0x0173 0x0173 0x0177
+sort_rev_data: 0x00d7 0x0082 0x016f 0x0172 0x0164 0x010e
+sort_rev_data: 0x00a5 0x0083 0x0141 0x015a 0x016d 0x016c
+sort_rev_data: 0x008b 0x0084 0x0170 0x0156 0x015a 0x017a
+sort_rev_data: 0x00f8 0x0085 0x016b 0x014e 0x015f 0x0164
+sort_rev_data: 0x00fb 0x0086 0x0148 0x0179 0x0173 0x0174
+sort_rev_data: 0x00aa 0x0087 0x0161 0x0172 0x0173 0x0168
+```
+
+---
+
+# UDP 
+'ALTOBEAM'
+sometimes the following will be triggered:
+
+```sh
+sort_rev_data: 0x00d2 0x0080 0x010a 0x016d 0x0179 0x0170
+sort_rev_data: 0x00c1 0x0081 0x0161 0x0173 0x0173 0x0177
+sort_rev_data: 0x00d7 0x0082 0x016f 0x0172 0x0164 0x010e
+sort_rev_data: 0x00a5 0x0083 0x0141 0x015a 0x016d 0x016c
+sort_rev_data: 0x008b 0x0084 0x0170 0x0156 0x015a 0x017a
+sort_rev_data: 0x00f8 0x0085 0x016b 0x014e 0x015f 0x0164
+sort_rev_data: 0x00fb 0x0086 0x0148 0x0179 0x0173 0x0174
+sort_rev_data: 0x00aa 0x0087 0x0161 0x0172 0x0173 0x0168
+```
+
+the current assumption is that the device running the mobile app will broadcast the ssid, token and password of the wifi network, and sees if the camera responds to the pairing request
+
+however, the above packets dont show up everytime....
+
+
+![[Pasted image 20241211091603.png]]
+
+I got blocked, which is impressive - I restarted my router to get a new public IP, which fixed the issue:
+![[Pasted image 20241211093505.png]]
+
+```sh
+[00:00:05.179|  info|  TUYA  ] TUYA UUid: szjsa682f393a1544949
+[00:00:05.179|  info|  TUYA  ] TUYA authkey: IK8ZcGo10bXqrOQ2k9PjnqyqnAdhY2fg
+[00:00:05.179|  info|  TUYA  ] TUYA pid: k1okbbubwccmdcaq
+```
+
+---
+
+# Drozer
+
+https://github.com/WithSecureLabs/drozer-agent/releases/tag/3.1.0
+```sh
+adb install drozer-agent.apk
+```
+
+Make sure drozer is running on the android device
+```sh
+drozer console connect
+```
+
+```sh
+adb forward tcp:31415 tcp:31415
+```
+
+```sh
+drozer console connect
+```
+
+
+![[Pasted image 20241211143052.png]]
+
+
+```sh
+run app.package.attacksurface com.merkuryinnovations.geeni
+
+Attempting to run shell module
+Attack Surface:
+  6 activities exported
+  3 broadcast receivers exported
+  0 content providers exported
+  3 services exported
+```
+
+![[Pasted image 20241211143543.png]]
+
+
+![[Pasted image 20241211143653.png]]
+
+![[Pasted image 20241211143751.png]]
+
+
+![[Pasted image 20241211143918.png]]
+
+This tells us where the data is stored for the app, we can check it for databases or other info that might be written to local storage
+```sh
+adb shell 
+su
+```
+
+```sh
+cd /data/user/0/com.merkuryinnovations.geeni
+```
+
+![[Pasted image 20241211144040.png]]
+
+lets see if any of these are valuable, all the DBs on the camera were password protected, lets see if its the same here
+
+![[Pasted image 20241211144150.png]]
+
+Since our android is a physical device rooted with magisk, we need to copy the database files to a directory a normal user has the permissions to - like the sdcard. 
+```sh
+cp -r /data/user/0/com.merkuryinnovations.geeni/databases/* /sdcard/
+
+```
+
+we pull the files from the device and browse the data:
+
+![[Pasted image 20241211145857.png]]
+
+nothing here
+
+[-] mqttAndroidService.db -> not encrypted but empty
+[-] tuyasmart_encrypt.db -> encrypted
+[-] tuyasmart_l -> not encrypted, contains data but doesn't appear to be useful
+[-] ty_tracker.db -> not encrypted, contains useless data 
+
+![[Pasted image 20241211150532.png]]
+
+extract from tuyasmart_l
+
+---
+
+
+# The mobile app
+
+![[Pasted image 20241210175413.png]]
+
+
+-> not working due to root detection (shocking)
+
+we now will attempt to embed the frida gadget into the apk, then use objection to disable root / ssl pinning
+
+```sh
+apktool d -o unpack com-merkuryinnovations-geeni_4.0.1_none_merge.apk
+```
+
+```sh
+cd unpack/lib/arm64-v8a
+```
+
+```sh
+wget https://github.com/frida/frida/releases/download/16.5.9/frida-gadget-16.5.9-android-arm64.so.xz
+```
+
+```sh
+7z x frida-gadget-16.5.9-android-arm64.so.xz
+```
+
+```sh
+mv frida-gadget-16.5.9-android-arm64.so libfrida-gadget.so
+```
+
+
+We need to add this line to ensure the frida lib is loaded 
+```xml
+<application android:allowBackup="false" android:allowNativeHeapPointerTagging="false" android:appComponentFactory="androidx.core.app.CoreComponentFactory" android:extractNativeLibs="true" android:hardwareAccelerated="true" android:icon="@mipmap/a961576" android:label="@string/app_name" android:largeHeap="true" android:name="com.smart.app.SmartApplication" android:networkSecurityConfig="@xml/c961576" android:preserveLegacyExternalStorage="true" android:requestLegacyExternalStorage="true" android:resizeableActivity="true" android:supportsRtl="false" android:theme="@style/Default_Public_Theme">
+```
+
+Confirming our write was successful 
+```xml
+cat AndroidManifest.xml | grep -i extractNativeLibs
+    <application android:allowBackup="false" android:allowNativeHeapPointerTagging="false"  android:appComponentFactory="androidx.core.app.CoreComponentFactory" android:extractNativeLibs="true" android:hardwareAccelerated="true" android:icon="@mipmap/a961576" android:label="@string/app_name" android:largeHeap="true" android:name="com.smart.app.SmartApplication" android:networkSecurityConfig="@xml/c961576" android:preserveLegacyExternalStorage="true" android:requestLegacyExternalStorage="true" android:resizeableActivity="true" android:supportsRtl="false" android:theme="@style/Default_Public_Theme">
+```
+
+
+Now we have to identify the main Activity 
+"FamilyHomeActivity" appears to stick out
+```xml
+<activity android:configChanges="keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize" android:excludeFromRecents="true" android:exported="false" android:launchMode="singleTask" android:name="com.thingclips.smart.hometab.activity.FamilyHomeActivity" android:screenOrientation="behind" android:theme="@style/Splash.Theme" android:windowSoftInputMode="adjustPan"/>
+
+<activity-alias android:exported="true" android:name="com.thingclips.smart.hometab.activity.FamilyHomeActivity.alias" android:targetActivity="com.thingclips.smart.hometab.activity.FamilyHomeActivity">
+```
+
+we need to find where this class is being defined, sorting through the files this sticks out:
+
+```sh
+smali_classes10/com/thingclips/smart/hometab/activity/FamilyHomeActivity.smali
+```
+
+we target the following section 
+
+```java
+.method public constructor <init>()V
+    .locals 1
+
+    .line 1
+    invoke-direct {p0}, Lcom/thingclips/smart/hometab/activity/Hilt_FamilyHomeActivity;-><init>()V
+
+    .line 2
+    .line 3
+    .line 4
+    const/4 v0, 0x0
+    
+    .line 5
+    iput-boolean v0, p0, Lcom/thingclips/smart/hometab/activity/FamilyHomeActivity;->e:Z
+
+    .line 6
+    .line 7
+    return-void
+```
+
+and convert it to this
+
+```java
+.method public constructor <init>()V
+    .locals 1
+
+    const-string v0, "frida-gadget"
+    invoke-static {v0}, Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V
+
+    invoke-direct {p0}, Lcom/thingclips/smart/hometab/activity/Hilt_FamilyHomeActivity;-><init>()V
+
+    const/4 v0, 0x0
+    iput-boolean v0, p0, Lcom/thingclips/smart/hometab/activity/FamilyHomeActivity;->e:Z
+
+    return-void
+```
+
+Now we have to re-pack the modded apk 
+
+```sh
+apktool b --use-aapt2 -o mod-app.apk unpack/
+```
+
+Next we ZIPalign the apk file:
+
+```sh
+zipalign 4 mod-app.apk final-mod-app.apk
+```
+
+All APK files need to be signed by a key. We run the following command to create a java key store (JKS):
+
+```sh
+keytool -genkey -v -keystore custom.keystore -alias mykeyaliasname -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Enter a password with at least 6 chars and press enter through the prompts until the prompt for yes/no - Now sign the APK  with our newly created JKS:
+
+```sh
+apksigner sign -ks custom.keystore final-mod-app.apk
+```
+
+We enter the password we setup for the keystore, the app should be ready to push to the device now.
+
+```sh
+adb install final-mod-app.apk
+```
+
+!TODO == crop
+
+![[Pasted image 20241210201940.png]]
+
+---
+
+# Profit
+
+![[Pasted image 20241209135656.png]]
+
+
+![[Pasted image 20241210210034.png]]
+
+## Attacking the app - finding the correct version
+
+From the observations above, the app has an anti tamper measure, it will not load if this check fails, I attempted to merge the two files into one and inject the gadget into the merged apk, this failed.
+
+Now we will try a different approach, attempting to use an older version of the app to see if this integrity check is enabled on all builds.
+
+`https://apk.support/download-app/com.merkuryinnovations.geeni/54/2.0.1`
+version 2.0.1(54) does not appear to have the check. 
+
+we try to simply use apk-mitm : 
+
+```sh
+./apk-mitm-linux geeni.apk
+[+] Executable file path: /tmp/apk-mitm-tempdir1012532987/apk-mitm-executable
+[+] Arguments: [geeni.apk]
+
+  ╭ apk-mitm v1.3.0
+  ├ apktool v2.9.3
+  ╰ uber-apk-signer v1.3.0
+
+  Using temporary directory:
+  /tmp/apk-mitm-c91c420af30e3e1c7033116d076e6062
+
+  ✔ Checking prerequisities
+  ✔ Checking prerequisities
+  ✔ Decoding APK file
+  ✔ Applying patches
+  ✔ Encoding patched APK file
+  ✔ Signing patched APK file
+
+   Done!  Patched file: ./geeni-patched.apk
+
+[+] Patching complete!
+```
+
+and install on the device 
+
+```sh
+adb install geeni-patched.apk
+Performing Streamed Install
+Success
+```
+
+and now the app launches with no issues:
+
+![[Pasted image 20241210220724.png]]
+
+we go through the motions of setting up the device on this old build, it seems to send the same Bluetooth packets to initialize the pairing process we discovered from the picocom logs earlier 
+
+!!TODO == add ble packets here
+
+![[Pasted image 20241210224852.png]]
+
+## Proxying the traffic through burp
+
+now that we have a build with pinning bypassed we can view the setup process from the apps perspective 
+
+![[Pasted image 20241210225029.png]]
+
+it seems as though everything is happening from the server to the client and the app is just a heartbeat 
+
+## BLE analysis
+
+We enabled HCI snoop logging on our rooted android device 
+
+![[Pasted image 20241210225157.png]]
+
+this will allow us to view the provisioning process via bluetooth 
+
+```sh
+adb bugreport
+```
+
+this will produce a zip containing all the logs from the device, we only need the bluetooth
+```sh
+cd FS/data/misc/bluetooth
+```
+
+```sh
+wireshark -r logs/btsnooz_hci.log
+```
+
+
+```sh
+sort_rev_data: 0x00d7 0x0082 0x016f 0x0172 0x0164 0x010e
+sort_rev_data: 0x0097 0x0083 0x0141 0x015a 0x0141 0x0170
+sort_rev_data: 0x00e4 0x0084 0x0170 0x0141 0x015a 0x0162
+sort_rev_data: 0x00a1 0x0085 0x0163 0x0168 0x015f 0x0164
+sort_rev_data: 0x00fb 0x0086 0x0148 0x0179 0x0173 0x0174
+sort_rev_data: 0x00aa 0x0087 0x0161 0x0172 0x0173 0x0168
+sort_rev_data: 0x00d2 0x0088 0x0169 0x0170 0x0100 0x0100
+```
+
+
+nothing sees to match this packet data, so if its not being sent from the app, or over bluetooth where? 
+
+
+Lets analyze the udp traffic...
+
+---
+
+# Cloud server
+
+34.219.85.253
+
+```sh
+Starting Nmap 7.95 ( https://nmap.org ) at 2024-12-09 15:23 AST
+Nmap scan report for ec2-34-219-85-253.us-west-2.compute.amazonaws.com (34.219.85.253)
+Host is up (0.085s latency).
+Not shown: 64525 filtered tcp ports (no-response), 1004 closed tcp ports (reset)
+Bug in mqtt-subscribe: no string output.
+PORT     STATE SERVICE       VERSION
+443/tcp  open  ssl/https?
+| ssl-cert: Subject: commonName=*.stream.iot-11.com
+| Subject Alternative Name: DNS:*.stream.iot-11.com, DNS:stream.iot-11.com
+| Not valid before: 2023-11-15T00:00:00
+|_Not valid after:  2024-12-15T23:59:59
+|_ssl-date: TLS randomness does not represent time
+1443/tcp open  ies-lm?
+1883/tcp open  mqtt?
+8080/tcp open  ssl/http      Golang net/http server (Go-IPFS json-rpc or InfluxDB API)
+| tls-alpn:
+|   h2
+|_  http/1.1
+|_http-title: Site doesn't have a title (text/plain; charset=utf-8).
+|_ssl-date: TLS randomness does not represent time
+| ssl-cert: Subject: commonName=*.stream.iot-11.com
+| Subject Alternative Name: DNS:*.stream.iot-11.com, DNS:stream.iot-11.com
+| Not valid before: 2023-11-15T00:00:00
+|_Not valid after:  2024-12-15T23:59:59
+9092/tcp open  XmlIpcRegSvc?
+9177/tcp open  http          Golang net/http server (Go-IPFS json-rpc or InfluxDB API)
+|_http-title: Site doesn't have a title (text/plain; charset=utf-8).
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+```
+
+![[Pasted image 20241209152727.png]]
+
+![[Pasted image 20241209152819.png]]
+
+```sh
+nslookup h2.iot-dns.com
+Server:		192.168.2.1
+Address:	192.168.2.1#53
+
+Non-authoritative answer:
+Name:	h2.iot-dns.com
+Address: 15.197.253.33
+Name:	h2.iot-dns.com
+Address: 3.33.239.251
+
+```
+
+## need to try
+
+https://github.com/guino/Merkury720
+https://www.reddit.com/r/geeni/comments/uv8laf/easily_unlockroot_your_geenituyamerkury_ip/
+
+https://github.com/guino/Geeni720P
+
+![[Pasted image 20241208235804.png]]
+
+
+
+### Simple wifi connect
+```sh
+lv_wifi_connect.sh starship mypassword
+```
+
+
+
+## Dockerfile for compiling busybox
+
+```sh
+FROM debian:bullseye-slim
+
+# Install necessary packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    wget \
+    gcc-arm-linux-gnueabi \
+    libc6-dev-armel-cross \
+    qemu-user \
+    make \
+    libncurses-dev \
+    && apt-get clean
+
+# Set the working directory
+WORKDIR /busybox
+
+# Download BusyBox source
+RUN wget https://busybox.net/downloads/busybox-1.36.0.tar.bz2 && \
+    tar xvf busybox-1.36.0.tar.bz2 && \
+    rm busybox-1.36.0.tar.bz2
+
+# Set the working directory to the BusyBox source
+WORKDIR /busybox/busybox-1.36.0
+
+# Set environment for cross-compilation
+ENV ARCH=arm
+ENV CROSS_COMPILE=arm-linux-gnueabi-
+
+# Default command to configure and build BusyBox
+CMD ["sh", "-c", "make defconfig && make LDFLAGS='-static' -j$(nproc) && cp busybox /output"]
+
+```
+
+```sh
+docker build -t busybox-arm-builder .
+```
+
+```bash
+docker run --rm -v "$(pwd)/output:/output" busybox-arm-builder
+```
+
+![[Pasted image 20241207225104.png]]
+
+full busybox functionality 
+
+
+![[Pasted image 20241207225704.png]]
+
+confirming mitmproxy is working
+
+---
