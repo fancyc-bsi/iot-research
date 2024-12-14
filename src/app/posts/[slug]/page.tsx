@@ -83,7 +83,7 @@ type Props = {
   searchParams: { [key: string]: string | string[] | undefined };
 };
 
-export default async function Post({ params, searchParams }: Props) {
+export default async function Post({ params }: Props) {
   const { frontmatter, content } = await getPost(params.slug);
 
   return (
