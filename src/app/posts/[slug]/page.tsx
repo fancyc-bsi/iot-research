@@ -7,6 +7,8 @@ import TableOfContents from '@/components/TableOfContents';
 import { mdxComponents } from '@/components/mdx-components';
 import type { BundledLanguage } from 'shiki';
 
+import { Metadata } from 'next';
+
 interface Frontmatter {
   title: string;
   date: string;
@@ -69,6 +71,7 @@ async function getPost(slug: string) {
   };
 }
 
+
 export async function generateStaticParams() {
   const files = fs.readdirSync(path.join(process.cwd(), 'src/content/posts'));
   return files.map((filename) => ({
@@ -76,15 +79,17 @@ export async function generateStaticParams() {
   }));
 }
 
+
 type Props = {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
   searchParams: { [key: string]: string | string[] | undefined };
 };
 
 export default async function Post({ params }: Props) {
-  const { frontmatter, content } = await getPost(params.slug);
+  const resolvedParams = await params;
+  const { frontmatter, content } = await getPost(resolvedParams.slug);
 
   return (
     <div className="min-h-screen bg-base pt-16">
