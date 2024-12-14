@@ -52,31 +52,54 @@ const ImageContainer = ({ children }: { children: React.ReactNode }) => (
 const MermaidDiagram = ({ content }: { content: string }) => {
   const [svg, setSvg] = React.useState<string>('');
   const [error, setError] = React.useState<string | null>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const diagramId = React.useId();
 
   React.useEffect(() => {
-    const renderDiagram = async () => {
-      try {
-        // Initialize mermaid with custom config
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: 'dark',
-          securityLevel: 'loose',
-          flowchart: {
-            curve: 'basis',
-            padding: 20
-          },
-          themeVariables: {
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-            fontSize: '16px',
-            lineColor: '#666',
-            mainBkg: '#1a1a1a',
-            textColor: '#fff'
-          }
-        });
+    // Initialize mermaid only once when component mounts
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      securityLevel: 'loose',
+      flowchart: {
+        curve: 'basis',
+        padding: 20,
+        nodeSpacing: 50,
+        rankSpacing: 50,
+      },
+      themeVariables: {
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontSize: '16px',
+        primaryColor: '#1e1e2e',
+        primaryTextColor: '#cdd6f4',
+        primaryBorderColor: '#45475a',
+        lineColor: '#45475a',
+        secondaryColor: '#181825',
+        tertiaryColor: '#1e1e2e'
+      }
+    });
 
-        const { svg } = await mermaid.render(`mermaid-${diagramId}`, content);
-        setSvg(svg);
+    const renderDiagram = async () => {
+      if (!content || !containerRef.current) return;
+
+      try {
+        // Clear previous content
+        containerRef.current.innerHTML = '';
+        
+        // Generate new SVG
+        const { svg } = await mermaid.render(`mermaid-${diagramId}`, content.trim());
+        
+        // Set the SVG content
+        containerRef.current.innerHTML = svg;
+        
+        // Post-process the SVG to apply additional styles
+        const svgElement = containerRef.current.querySelector('svg');
+        if (svgElement) {
+          svgElement.style.maxWidth = '100%';
+          svgElement.style.height = 'auto';
+          // Add more SVG styles as needed
+        }
+        
         setError(null);
       } catch (err) {
         console.error('Mermaid rendering error:', err);
@@ -84,9 +107,7 @@ const MermaidDiagram = ({ content }: { content: string }) => {
       }
     };
 
-    if (content) {
-      renderDiagram();
-    }
+    renderDiagram();
   }, [content, diagramId]);
 
   if (error) {
@@ -99,8 +120,8 @@ const MermaidDiagram = ({ content }: { content: string }) => {
 
   return (
     <div 
-      className="my-4 p-4 bg-gray-900/50 rounded-lg overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: svg }} 
+      ref={containerRef}
+      className="my-4 p-4 bg-base rounded-lg overflow-x-auto"
     />
   );
 };
@@ -159,6 +180,7 @@ export const mdxComponents = {
     return <p className="my-4 leading-relaxed">{children}</p>;
   },
   pre: ({ children }: PreProps) => {
+    // Check if it's a mermaid diagram
     if (
       React.isValidElement(children) &&
       children.props?.className?.includes('language-mermaid')
@@ -166,8 +188,9 @@ export const mdxComponents = {
       return <MermaidDiagram content={children.props.children} />;
     }
 
+    // Regular pre block
     return (
-      <pre className="bg-gray-800 p-4 rounded-lg overflow-x-auto my-4">
+      <pre className="bg-mantle p-4 rounded-lg overflow-x-auto my-4 border border-surface0">
         {children}
       </pre>
     );
