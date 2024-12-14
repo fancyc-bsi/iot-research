@@ -5,7 +5,7 @@ import { MDXRemote } from 'next-mdx-remote/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
 import TableOfContents from '@/components/TableOfContents';
 import { mdxComponents } from '@/components/mdx-components';
-import type { BundledLanguage, BundledTheme } from 'shiki';
+import type { BundledLanguage } from 'shiki';
 
 interface Frontmatter {
   title: string;
