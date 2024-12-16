@@ -73,21 +73,28 @@ const ObsidianImage = ({ content }: { content: string }) => {
   const imagePath = `/iot-research/images/posts/geeni-glimpse/${imageName}`;
   
   return (
-    <div className="relative w-full h-[300px] my-2">
-      <Image
-        src={imagePath}
-        alt={imageName}
-        fill
-        className="object-contain"
-        quality={90}
-        loading="lazy"
-      />
+    <div className="my-8 max-w-3xl mx-auto">
+      <div className="relative aspect-[16/10] w-full rounded-lg overflow-hidden border border-surface0 shadow-lg">
+        <Image
+          src={imagePath}
+          alt={imageName}
+          fill
+          className="object-contain bg-mantle"
+          quality={95}
+          loading="lazy"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 50vw"
+        />
+      </div>
+      <figcaption className="mt-2 text-center text-sm text-subtext0">
+        {imageName.replace(/-/g, ' ')}
+      </figcaption>
     </div>
   );
 };
 
+// Updated ImageContainer for multiple images
 const ImageContainer = ({ children }: { children: React.ReactNode }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 my-8 max-w-4xl mx-auto">
     {children}
   </div>
 );
@@ -122,7 +129,7 @@ export const mdxComponents = {
       if (children.startsWith('![[')) {
         return <ObsidianImage content={children} />;
       }
-      return <p className="my-4 leading-relaxed">{children}</p>;
+      return <p className="my-4 leading-relaxed text-subtext0">{children}</p>;
     }
 
     if (Array.isArray(children)) {
@@ -143,7 +150,7 @@ export const mdxComponents = {
       }
     }
 
-    return <p className="my-4 leading-relaxed">{children}</p>;
+    return <p className="my-4 leading-relaxed text-subtext0">{children}</p>;
   },
 };
 
@@ -180,56 +187,68 @@ export default async function Post({ params }: Props) {
   const { frontmatter, content } = await getPost(resolvedParams.slug);
 
   return (
-    <div className="min-h-screen bg-base pt-16">
-      <div className="flex justify-between">
-        <div className="hidden lg:block w-64 fixed left-0 top-16 h-[calc(100vh-4rem)] overflow-y-auto bg-mantle border-r border-surface0">
-          <div className="px-4 py-6">
+    <div className="min-h-screen bg-base">
+      <div className="flex flex-col lg:flex-row">
+        {/* Sidebar */}
+        <div className="hidden lg:block w-64 h-[calc(100vh-4rem)] sticky top-16 shrink-0 overflow-y-auto border-r border-surface0">
+          <div className="p-6">
+            <h2 className="text-lg font-semibold text-text mb-4">Table of Contents</h2>
             <TableOfContents content={content} />
           </div>
         </div>
 
-        <article className="flex-1 max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-12 py-12 lg:ml-64">
-          <header className="mb-8">
-            <h1 className="text-4xl font-bold text-text mb-2">
-              {frontmatter.title}
-            </h1>
-            <time className="text-subtext0">
-              {new Date(frontmatter.date).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
-            </time>
-          </header>
+        {/* Main Content */}
+        <main className="flex-1 min-w-0">
+          <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <header className="mb-12">
+              <h1 className="text-4xl font-bold text-text mb-4">
+                {frontmatter.title}
+              </h1>
+              <time className="text-subtext0">
+                {new Date(frontmatter.date).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </time>
+            </header>
 
-          <div className="prose prose-invert prose-lg max-w-none 
-            prose-headings:text-text 
-            prose-p:text-subtext0 
-            prose-a:text-blue hover:prose-a:text-sapphire
-            prose-strong:text-mauve
-            prose-code:text-peach
-            [&>pre]:!bg-mantle
-            [&>pre]:border
-            [&>pre]:border-surface0
-            [&>pre]:rounded-lg
-            [&>pre]:shadow-lg">
-            <MDXRemote
-              source={content}
-              options={{
-                mdxOptions: {
-                  remarkPlugins: [],
-                  rehypePlugins: [
-                    [rehypePrettyCode, rehypeOptions]
-                  ],
-                  format: 'mdx'
-                }
-              }}
-              components={mdxComponents}
-            />
-          </div>
-        </article>
-
-        <div className="hidden lg:block w-64 shrink-0" />
+            <div className="prose prose-invert prose-lg max-w-none 
+              prose-headings:text-text 
+              prose-headings:font-semibold
+              prose-p:text-subtext0 
+              prose-p:leading-relaxed
+              prose-a:text-blue 
+              prose-a:no-underline
+              hover:prose-a:text-sapphire
+              hover:prose-a:underline
+              prose-strong:text-mauve
+              prose-code:text-peach
+              prose-pre:my-8
+              prose-pre:bg-mantle
+              prose-pre:border
+              prose-pre:border-surface0
+              prose-pre:rounded-lg
+              prose-pre:shadow-lg
+              [&>pre]:p-6
+              [&>:not(pre)>code]:px-1.5
+              [&>:not(pre)>code]:py-0.5
+              [&>:not(pre)>code]:rounded
+              [&>:not(pre)>code]:bg-surface0/50">
+              <MDXRemote
+                source={content}
+                options={{
+                  mdxOptions: {
+                    remarkPlugins: [],
+                    rehypePlugins: [[rehypePrettyCode, rehypeOptions]],
+                    format: 'mdx'
+                  }
+                }}
+                components={mdxComponents}
+              />
+            </div>
+          </article>
+        </main>
       </div>
     </div>
   );

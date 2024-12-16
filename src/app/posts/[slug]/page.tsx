@@ -130,10 +130,21 @@ export default async function Post({ params }: Props) {
               prose-pre:border-surface0
               prose-pre:rounded-lg
               prose-pre:shadow-lg
+              prose-img:max-w-3xl
+              prose-img:mx-auto
               prose-img:rounded-lg
               prose-img:shadow-lg
               prose-img:border
               prose-img:border-surface0
+              prose-img:!my-8
+              [&_figure]:my-8
+              [&_figure]:mx-auto
+              [&_figure]:max-w-3xl
+              [&_figure>img]:!my-0
+              [&_figure>figcaption]:text-center
+              [&_figure>figcaption]:text-sm
+              [&_figure>figcaption]:text-subtext0
+              [&_figure>figcaption]:mt-2
               [&>*:first-child]:mt-0
               [&>pre]:p-6
               [&>:not(pre)>code]:px-1.5
@@ -152,7 +163,8 @@ export default async function Post({ params }: Props) {
               [&>table>thead>tr>th]:p-2
               [&>table>tbody>tr>td]:border
               [&>table>tbody>tr>td]:border-surface0
-              [&>table>tbody>tr>td]:p-2">
+              [&>table>tbody>tr>td]:p-2
+              divide-y divide-surface0">
               <MDXRemote
                 source={content}
                 options={{
