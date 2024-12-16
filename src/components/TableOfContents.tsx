@@ -1,6 +1,5 @@
 'use client';
 
-// src/components/TableOfContents.tsx
 import React, { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 
@@ -11,13 +10,13 @@ interface TOCItem {
 
 const TableOfContents = ({ content }: { content: string }) => {
   const [activeId, setActiveId] = useState<string>('');
-  
-  // Parse only true h1 headers from markdown content, ignoring code blocks
+
+  // Parse headers from markdown content, ignoring code blocks
   const getHeaders = (markdown: string): TOCItem[] => {
     const headers: TOCItem[] = [];
     const lines = markdown.split('\n');
     let isInCodeBlock = false;
-    
+
     lines.forEach((line, index) => {
       // Check for code block delimitation
       if (line.trim().startsWith('```') || line.trim().match(/^~~~+/)) {
@@ -26,19 +25,19 @@ const TableOfContents = ({ content }: { content: string }) => {
       }
 
       // Skip indented code blocks (4 spaces or tab)
-      if (line.startsWith('    ') || line.startsWith('\t')) {
+      if (line.startsWith(' ') || line.startsWith('\t')) {
         return;
       }
 
       // Only process headers if we're not in a code block
       if (!isInCodeBlock) {
-        // Strict match for markdown h1 headers at the start of the line
-        const match = line.trim().match(/^#\s+([^#].*)$/);
+        // Match both h1 and h2 headers
+        const match = line.trim().match(/^(#{1,2})\s+([^#].*)$/);
         if (match) {
           // Check if previous line is blank or start of file
           const prevLine = index > 0 ? lines[index - 1].trim() : '';
-          if (prevLine === '') {  // Only consider headers that have a blank line before them
-            const title = match[1].trim();
+          if (prevLine === '') {
+            const title = match[2].trim();
             const id = title
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, '-')
@@ -48,7 +47,6 @@ const TableOfContents = ({ content }: { content: string }) => {
         }
       }
     });
-    
     return headers;
   };
 
@@ -63,11 +61,11 @@ const TableOfContents = ({ content }: { content: string }) => {
     };
 
     const observer = new IntersectionObserver(callback, {
-      rootMargin: '-80px 0px -80% 0px'
+      rootMargin: '-100px 0px -80% 0px'
     });
 
-    // Only observe h1 elements
-    const headers = document.querySelectorAll('h1');
+    // Observe both h1 and h2 elements
+    const headers = document.querySelectorAll('h1, h2');
     headers.forEach((header) => observer.observe(header));
 
     return () => observer.disconnect();
@@ -77,8 +75,7 @@ const TableOfContents = ({ content }: { content: string }) => {
   const scrollToHeader = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      const navHeight = 64; // Height of your navigation bar
-      const offset = element.getBoundingClientRect().top + window.scrollY - navHeight - 20;
+      const offset = element.getBoundingClientRect().top + window.scrollY - 32;
       window.scrollTo({
         top: offset,
         behavior: 'smooth'
@@ -87,33 +84,35 @@ const TableOfContents = ({ content }: { content: string }) => {
   };
 
   const headers = getHeaders(content);
-
-  if (headers.length <= 1) return null; // Don't show TOC if there's only one or no headers
+  if (headers.length === 0) return null;
 
   return (
-    <nav className="hidden lg:block fixed left-8 top-24 w-64 overflow-y-auto max-h-[calc(100vh-8rem)]">
-      <div className="border-l-2 border-gray-700 pl-4">
-        <h2 className="text-sm font-semibold text-gray-400 mb-4">Main Sections</h2>
-        <ul className="space-y-3">
-          {headers.map((header) => (
-            <li key={header.id}>
-              <button
-                onClick={() => scrollToHeader(header.id)}
-                className={`text-sm flex items-center hover:text-blue-400 w-full text-left ${
+    <nav className="text-sm">
+      <ul className="space-y-2">
+        {headers.map((header) => (
+          <li key={header.id}>
+            <button
+              onClick={() => scrollToHeader(header.id)}
+              className={`group flex items-center w-full text-left transition-colors
+                ${
                   activeId === header.id
-                    ? 'text-blue-500 font-medium'
-                    : 'text-gray-400'
+                    ? 'text-blue font-medium'
+                    : 'text-subtext0 hover:text-blue'
                 }`}
-              >
-                <ChevronRight className={`h-3 w-3 mr-1 flex-shrink-0 ${
-                  activeId === header.id ? 'text-blue-500' : 'text-gray-600'
-                }`} />
-                <span className="line-clamp-2">{header.title}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
+            >
+              <ChevronRight 
+                className={`h-4 w-4 mr-2 transition-colors
+                  ${
+                    activeId === header.id
+                      ? 'text-blue'
+                      : 'text-surface0 group-hover:text-blue'
+                  }`}
+              />
+              <span className="line-clamp-2">{header.title}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </nav>
   );
 };

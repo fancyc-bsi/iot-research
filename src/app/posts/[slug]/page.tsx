@@ -83,39 +83,39 @@ export default async function Post({ params }: Props) {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-base to-mantle">
-      {/* Header Section */}
-      <header className="fixed top-16 left-0 right-0 z-10 bg-base/80 backdrop-blur-sm border-b border-surface0">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col">
-            <h1 className="text-4xl font-bold text-text">{frontmatter.title}</h1>
-            <div className="flex items-center gap-2 mt-2 text-subtext0">
-              <time className="text-sm">{formattedDate}</time>
-              <span className="text-surface0">•</span>
-              <span className="text-sm">{frontmatter.excerpt}</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="pt-44 pb-16 flex justify-between max-w-[1600px] mx-auto">
-        {/* Table of Contents Sidebar */}
-        <aside className="hidden lg:block w-72 fixed left-0 top-44 h-[calc(100vh-11rem)] overflow-y-auto border-r border-surface0">
-          <div className="px-6 py-4">
+    <div className="min-h-screen bg-base">
+      <div className="flex flex-col lg:flex-row">
+        {/* Sidebar */}
+        <div className="hidden lg:block w-64 h-[calc(100vh-4rem)] sticky top-16 shrink-0 overflow-y-auto border-r border-surface0">
+          <div className="p-6">
             <h2 className="text-lg font-semibold text-text mb-4">Table of Contents</h2>
             <TableOfContents content={content} />
           </div>
-        </aside>
+        </div>
 
         {/* Main Content */}
-        <main className="flex-1 w-full lg:w-[calc(100%-18rem)] lg:ml-72">
-          <article className="max-w-[900px] mx-auto px-4 sm:px-6 lg:px-8">
+        <main className="flex-1 min-w-0">
+          <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            {/* Article Header */}
+            <header className="mb-8">
+              <h1 className="text-4xl font-bold text-text mb-4">
+                {frontmatter.title}
+              </h1>
+              <div className="flex items-center gap-2 text-subtext0">
+                <time className="text-sm">{formattedDate}</time>
+                {frontmatter.excerpt && (
+                  <>
+                    <span className="text-surface0">•</span>
+                    <span className="text-sm">{frontmatter.excerpt}</span>
+                  </>
+                )}
+              </div>
+            </header>
+
+            {/* Article Content */}
             <div className="prose prose-invert prose-lg max-w-none 
               prose-headings:text-text 
-              prose-headings:scroll-mt-32
-              prose-h1:text-4xl
-              prose-h2:text-3xl
-              prose-h3:text-2xl
+              prose-headings:font-semibold
               prose-p:text-subtext0 
               prose-p:leading-relaxed
               prose-a:text-blue 
@@ -144,6 +144,8 @@ export default async function Post({ params }: Props) {
               [&>blockquote]:border-l-4
               [&>blockquote]:border-blue
               [&>blockquote]:bg-surface0/20
+              [&>blockquote]:px-4
+              [&>blockquote]:py-2
               [&>table]:border-collapse
               [&>table]:w-full
               [&>table>thead>tr>th]:bg-surface0/50
