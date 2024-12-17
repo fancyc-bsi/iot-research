@@ -62,23 +62,28 @@ const rehypeOptions = {
   },
 };
 
-// Enhanced ObsidianImage Component with better aspect ratio handling
 const ObsidianImage = ({ content }: { content: string }) => {
   const imageName = content.replace(/!\[\[(.*?)\]\]/, '$1');
   const imagePath = `/iot-research/images/posts/geeni-glimpse/${imageName}`;
   
   return (
     <figure className="my-8">
-      <div className="relative w-full overflow-hidden bg-mantle/50">
-        <div className="aspect-video relative">
+      <div className="relative w-full max-h-[800px] bg-mantle/50 rounded-lg">
+        <div className="relative min-h-[200px] w-full">
           <Image
             src={imagePath}
             alt={imageName.split('-').join(' ')}
             fill
-            className="object-contain hover:scale-105 transition-transform duration-300"
+            className="object-contain rounded-lg"
             quality={100}
             loading="lazy"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 50vw"
+            style={{
+              maxHeight: '800px',
+              width: 'auto',
+              height: 'auto',
+              position: 'relative'
+            }}
           />
         </div>
       </div>
@@ -89,12 +94,12 @@ const ObsidianImage = ({ content }: { content: string }) => {
   );
 };
 
-// Improved ImageContainer for better grid layout
 const ImageContainer = ({ children }: { children: React.ReactNode }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
     {children}
   </div>
 );
+
 
 export const mdxComponents = {
   h1: ({ children }: HeadingProps) => {
