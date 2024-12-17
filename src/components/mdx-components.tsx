@@ -8,7 +8,6 @@ import Image from 'next/image';
 import TableOfContents from '@/components/TableOfContents';
 import type { BundledLanguage } from 'shiki';
 
-// Types and interfaces remain the same
 interface Frontmatter {
   title: string;
   date: string;
@@ -30,14 +29,12 @@ interface ParagraphProps {
   children: React.ReactNode | React.ReactNode[];
 }
 
-// Utility Functions
 const slugify = (str: string) =>
   str
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
-// Updated Rehype Options
 const rehypeOptions = {
   theme: 'catppuccin-mocha',
   keepBackground: true,
@@ -65,23 +62,25 @@ const rehypeOptions = {
   },
 };
 
-// Enhanced ObsidianImage Component
+// Enhanced ObsidianImage Component with better aspect ratio handling
 const ObsidianImage = ({ content }: { content: string }) => {
   const imageName = content.replace(/!\[\[(.*?)\]\]/, '$1');
   const imagePath = `/iot-research/images/posts/geeni-glimpse/${imageName}`;
   
   return (
     <figure className="my-8">
-      <div className="relative aspect-[16/9] w-full rounded-lg overflow-hidden bg-mantle border border-surface0 shadow-lg">
-        <Image
-          src={imagePath}
-          alt={imageName}
-          fill
-          className="object-contain"
-          quality={95}
-          loading="lazy"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 900px"
-        />
+      <div className="relative w-full overflow-hidden bg-mantle/50">
+        <div className="aspect-video relative">
+          <Image
+            src={imagePath}
+            alt={imageName.split('-').join(' ')}
+            fill
+            className="object-contain hover:scale-105 transition-transform duration-300"
+            quality={100}
+            loading="lazy"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 50vw"
+          />
+        </div>
       </div>
       <figcaption className="mt-3 text-center text-sm text-subtext0">
         {imageName.split('-').join(' ')}
@@ -90,14 +89,13 @@ const ObsidianImage = ({ content }: { content: string }) => {
   );
 };
 
-// Enhanced ImageContainer Component
+// Improved ImageContainer for better grid layout
 const ImageContainer = ({ children }: { children: React.ReactNode }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 my-12">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
     {children}
   </div>
 );
 
-// MDX Components
 export const mdxComponents = {
   h1: ({ children }: HeadingProps) => {
     const id = slugify(children?.toString() || '');
@@ -153,7 +151,6 @@ export const mdxComponents = {
   },
 };
 
-// Post Fetching Function
 async function getPost(slug: string) {
   const markdownFile = fs.readFileSync(
     path.join(process.cwd(), 'src/content/posts', slug + '.mdx'),
@@ -173,7 +170,6 @@ export async function generateStaticParams() {
   }));
 }
 
-// Props Type
 type Props = {
   params: Promise<{
     slug: string;
@@ -181,7 +177,6 @@ type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-// Enhanced Post Component
 export default async function Post({ params }: Props) {
   const resolvedParams = await params;
   const { frontmatter, content } = await getPost(resolvedParams.slug);
@@ -193,77 +188,82 @@ export default async function Post({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-base to-mantle">
+      {/* Header Banner */}
+      <div className="w-full bg-surface0/10 border-b border-surface0/50">
+        <div className="max-w-[1600px] mx-auto px-6 py-12">
+          <h1 className="text-4xl lg:text-5xl font-bold text-text mb-6 leading-tight">
+            {frontmatter.title}
+          </h1>
+          <div className="flex flex-wrap items-center gap-4">
+            <time className="text-sm px-4 py-1.5 rounded-full bg-surface0/30 text-subtext0 font-medium">
+              {formattedDate}
+            </time>
+            {frontmatter.excerpt && (
+              <p className="text-lg text-subtext0 leading-relaxed max-w-2xl">
+                {frontmatter.excerpt}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-[1600px] mx-auto">
         <div className="flex flex-col lg:flex-row">
-          {/* Enhanced Sidebar */}
-          <aside className="hidden lg:block w-72 h-[calc(100vh-4rem)] sticky top-16 shrink-0 overflow-y-auto border-r border-surface0 bg-base/50 backdrop-blur-sm">
+          {/* Sidebar */}
+          <aside className="hidden lg:block w-72 h-[calc(100vh-4rem)] sticky top-16 shrink-0 overflow-y-auto border-r border-surface0/50">
             <div className="p-8">
               <h2 className="text-lg font-semibold text-text mb-6">Table of Contents</h2>
               <TableOfContents content={content} />
             </div>
           </aside>
 
-          {/* Enhanced Main Content */}
-          <main className="flex-1 min-w-0 bg-base/50 backdrop-blur-sm">
-            <article className="max-w-3xl mx-auto px-6 lg:px-12 py-16">
-              {/* Enhanced Header */}
-              <header className="mb-16 border-b border-surface0 pb-8">
-                <h1 className="text-4xl lg:text-5xl font-bold text-text mb-6 leading-tight">
-                  {frontmatter.title}
-                </h1>
-                <div className="flex flex-wrap items-center gap-4 text-subtext0">
-                  <time className="text-sm bg-surface0/50 px-3 py-1 rounded-full">
-                    {formattedDate}
-                  </time>
-                  {frontmatter.excerpt && (
-                    <p className="text-sm">{frontmatter.excerpt}</p>
-                  )}
-                </div>
-              </header>
-
-              {/* Enhanced Content */}
+          {/* Main Content */}
+          <main className="flex-1 min-w-0">
+            <article className="max-w-4xl mx-auto px-6 lg:px-16 py-12">
               <div className="prose prose-invert prose-lg max-w-none 
                 prose-headings:text-text 
                 prose-headings:font-semibold
+                prose-headings:scroll-mt-20
                 prose-p:text-subtext0 
-                prose-p:leading-relaxed
+                prose-p:leading-7
+                prose-p:my-6
                 prose-a:text-blue 
                 prose-a:no-underline
-                hover:prose-a:text-sapphire
-                hover:prose-a:underline
+                prose-a:border-b
+                prose-a:border-blue/30
+                hover:prose-a:border-blue
                 prose-strong:text-mauve
+                prose-strong:font-semibold
                 prose-code:text-peach
-                prose-pre:my-8
                 prose-pre:bg-mantle
                 prose-pre:border
-                prose-pre:border-surface0
-                prose-pre:rounded-lg
+                prose-pre:border-surface0/50
+                prose-pre:rounded-xl
                 prose-pre:shadow-lg
-                prose-img:rounded-xl
-                prose-img:shadow-xl
-                prose-img:border-2
-                prose-img:border-surface0
+                prose-pre:my-8
                 [&>*:first-child]:mt-0
                 [&>pre]:p-6
-                [&>:not(pre)>code]:px-1.5
-                [&>:not(pre)>code]:py-0.5
-                [&>:not(pre)>code]:rounded
-                [&>:not(pre)>code]:bg-surface0/50
-                [&>hr]:border-surface0
+                [&>:not(pre)>code]:px-2
+                [&>:not(pre)>code]:py-1
+                [&>:not(pre)>code]:rounded-md
+                [&>:not(pre)>code]:bg-surface0/40
+                [&>hr]:my-12
+                [&>hr]:border-surface0/50
                 [&>blockquote]:border-l-4
                 [&>blockquote]:border-blue
-                [&>blockquote]:bg-surface0/20
-                [&>blockquote]:px-6
-                [&>blockquote]:py-4
-                [&>blockquote]:rounded-r-lg
+                [&>blockquote]:bg-surface0/10
+                [&>blockquote]:px-8
+                [&>blockquote]:py-6
+                [&>blockquote]:rounded-r-xl
                 [&>blockquote]:shadow-sm
                 [&>table]:border-collapse
                 [&>table]:w-full
-                [&>table>thead>tr>th]:bg-surface0/50
-                [&>table>thead>tr>th]:p-2
+                [&>table]:my-8
+                [&>table>thead>tr>th]:bg-surface0/30
+                [&>table>thead>tr>th]:p-3
                 [&>table>tbody>tr>td]:border
-                [&>table>tbody>tr>td]:border-surface0
-                [&>table>tbody>tr>td]:p-2">
+                [&>table>tbody>tr>td]:border-surface0/50
+                [&>table>tbody>tr>td]:p-3">
                 <MDXRemote
                   source={content}
                   options={{
