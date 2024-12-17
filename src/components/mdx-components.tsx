@@ -67,9 +67,9 @@ const ObsidianImage = ({ content }: { content: string }) => {
   const imagePath = `/iot-research/images/posts/geeni-glimpse/${imageName}`;
   
   return (
-    <figure className="my-8">
-      <div className="relative w-full max-h-[800px] bg-mantle/50 rounded-lg">
-        <div className="relative min-h-[200px] w-full">
+    <figure className="my-8 flex justify-center">
+      <div className="relative w-full max-h-[800px] bg-mantle/50 rounded-lg flex justify-center">
+        <div className="relative min-h-[200px] w-full flex justify-center items-center">
           <Image
             src={imagePath}
             alt={imageName.split('-').join(' ')}
@@ -87,9 +87,6 @@ const ObsidianImage = ({ content }: { content: string }) => {
           />
         </div>
       </div>
-      <figcaption className="mt-3 text-center text-sm text-subtext0">
-        {imageName.split('-').join(' ')}
-      </figcaption>
     </figure>
   );
 };
