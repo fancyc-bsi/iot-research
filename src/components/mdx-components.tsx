@@ -62,17 +62,32 @@ const rehypeOptions = {
   },
 };
 
+interface ImageData {
+  imageName: string;
+  caption?: string;
+}
+
+const parseImageContent = (content: string): ImageData => {
+  const imageMatch = content.match(/!\[\[(.*?)\]\](?:\(caption: (.*?)\))?/);
+  if (!imageMatch) return { imageName: '' };
+
+  return {
+    imageName: imageMatch[1],
+    caption: imageMatch[2]
+  };
+};
+
 const ObsidianImage = ({ content }: { content: string }) => {
-  const imageName = content.replace(/!\[\[(.*?)\]\]/, '$1');
+  const { imageName, caption } = parseImageContent(content);
   const imagePath = `/iot-research/images/posts/geeni-glimpse/${imageName}`;
   
   return (
-    <figure className="my-8 flex justify-center">
+    <figure className="my-8 flex flex-col items-center">
       <div className="relative w-full max-h-[800px] bg-mantle/50 rounded-lg flex justify-center">
         <div className="relative min-h-[200px] w-full flex justify-center items-center">
           <Image
             src={imagePath}
-            alt={imageName.split('-').join(' ')}
+            alt={caption || imageName.split('-').join(' ')}
             fill
             className="object-contain rounded-lg"
             quality={100}
@@ -87,6 +102,11 @@ const ObsidianImage = ({ content }: { content: string }) => {
           />
         </div>
       </div>
+      {caption && (
+        <figcaption className="mt-4 text-sm text-subtext0 italic">
+          {caption}
+        </figcaption>
+      )}
     </figure>
   );
 };
@@ -96,7 +116,6 @@ const ImageContainer = ({ children }: { children: React.ReactNode }) => (
     {children}
   </div>
 );
-
 
 export const mdxComponents = {
   h1: ({ children }: HeadingProps) => {
