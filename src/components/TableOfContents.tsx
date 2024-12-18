@@ -77,17 +77,17 @@ const TableOfContents = ({ content }: { content: string }) => {
   if (headers.length === 0) return null;
 
   return (
-    <div className="bg-surface0/30 rounded-lg p-6 backdrop-blur-sm">
-      <h2 className="text-xl font-semibold text-text mb-6 px-2">
+    <div className="bg-surface0/30 rounded-lg p-4 backdrop-blur-sm -mx-8">
+      <h2 className="text-xl font-semibold text-text mb-4 px-2">
         Table of Contents
       </h2>
       <nav className="text-base">
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {headers.map((header) => (
             <li key={header.id}>
               <button
                 onClick={() => scrollToHeader(header.id)}
-                className={`group flex items-center w-full px-4 py-2.5 rounded-md transition-all
+                className={`group flex items-center w-full px-2 py-2 rounded-md transition-all
                   ${
                     activeId === header.id
                       ? 'bg-blue/10 text-blue font-medium'
@@ -95,14 +95,14 @@ const TableOfContents = ({ content }: { content: string }) => {
                   }`}
               >
                 <ChevronRight
-                  className={`h-5 w-5 mr-3 flex-shrink-0 transition-transform
+                  className={`h-5 w-5 mr-2 flex-shrink-0 transition-transform
                     ${
                       activeId === header.id
                         ? 'text-blue transform rotate-90'
                         : 'text-surface1 group-hover:text-text'
                     }`}
                 />
-                <span className="truncate">{header.title}</span>
+                <span className="truncate text-base">{header.title}</span>
               </button>
             </li>
           ))}
