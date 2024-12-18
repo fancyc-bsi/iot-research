@@ -103,11 +103,10 @@ export default async function Post({ params }: Props) {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row max-w-[1600px] mx-auto">
+      <div className="max-w-[1600px] mx-auto flex flex-col lg:flex-row">
         {/* Left Sidebar - Table of Contents */}
-        <aside className="hidden lg:block w-96 h-[calc(100vh-4rem)] sticky top-16 shrink-0 overflow-y-auto border-r border-surface0/50">          <div className="px-8 py-8">
+        <aside className="hidden lg:block w-96 h-[calc(100vh-4rem)] sticky top-16 shrink-0 overflow-y-auto border-r border-surface0/50">
             <TableOfContents content={content} />
-          </div>
         </aside>
 
         {/* Main Content */}
