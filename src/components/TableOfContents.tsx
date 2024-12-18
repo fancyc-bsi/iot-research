@@ -73,7 +73,7 @@ const TableOfContents = ({ content }: { content: string }) => {
   if (headers.length === 0) return null;
 
   return (
-    <div className="bg-surface0/30 rounded-lg p-4 backdrop-blur-sm -mx-8">
+    <div className="bg-surface0/30 rounded-lg p-4 backdrop-blur-sm">
       <h2 className="text-lg font-semibold text-text mb-4 px-2">
         Table of Contents
       </h2>
