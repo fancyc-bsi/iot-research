@@ -107,7 +107,6 @@ export default async function Post({ params }: Props) {
         {/* Left Sidebar - Table of Contents */}
         <div className="hidden xl:block w-72 h-[calc(100vh-4rem)] sticky top-16 shrink-0 overflow-y-auto border-r border-surface0/50">
           <div className="p-8">
-            <h2 className="text-lg font-semibold text-text mb-6">Table of Contents</h2>
             <TableOfContents content={content} />
           </div>
         </div>
