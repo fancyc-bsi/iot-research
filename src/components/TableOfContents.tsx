@@ -11,30 +11,24 @@ interface TOCItem {
 const TableOfContents = ({ content }: { content: string }) => {
   const [activeId, setActiveId] = useState<string>('');
 
-  // Parse headers from markdown content, ignoring code blocks
   const getHeaders = (markdown: string): TOCItem[] => {
     const headers: TOCItem[] = [];
     const lines = markdown.split('\n');
     let isInCodeBlock = false;
 
     lines.forEach((line, index) => {
-      // Check for code block delimitation
       if (line.trim().startsWith('```') || line.trim().match(/^~~~+/)) {
         isInCodeBlock = !isInCodeBlock;
         return;
       }
-
-      // Skip indented code blocks (4 spaces or tab)
+      
       if (line.startsWith(' ') || line.startsWith('\t')) {
         return;
       }
-
-      // Only process headers if we're not in a code block
+      
       if (!isInCodeBlock) {
-        // Match both h1 and h2 headers
         const match = line.trim().match(/^(#{1,2})\s+([^#].*)$/);
         if (match) {
-          // Check if previous line is blank or start of file
           const prevLine = index > 0 ? lines[index - 1].trim() : '';
           if (prevLine === '') {
             const title = match[2].trim();
@@ -50,7 +44,6 @@ const TableOfContents = ({ content }: { content: string }) => {
     return headers;
   };
 
-  // Set up intersection observer for active header tracking
   useEffect(() => {
     const callback = (entries: IntersectionObserverEntry[]) => {
       entries.forEach((entry) => {
@@ -64,14 +57,11 @@ const TableOfContents = ({ content }: { content: string }) => {
       rootMargin: '-100px 0px -80% 0px'
     });
 
-    // Observe both h1 and h2 elements
     const headers = document.querySelectorAll('h1, h2');
     headers.forEach((header) => observer.observe(header));
-
     return () => observer.disconnect();
   }, []);
 
-  // Smooth scroll function with offset
   const scrollToHeader = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
@@ -87,33 +77,38 @@ const TableOfContents = ({ content }: { content: string }) => {
   if (headers.length === 0) return null;
 
   return (
-    <nav className="text-sm">
-      <ul className="space-y-2">
-        {headers.map((header) => (
-          <li key={header.id}>
-            <button
-              onClick={() => scrollToHeader(header.id)}
-              className={`group flex items-center w-full text-left transition-colors
-                ${
-                  activeId === header.id
-                    ? 'text-blue font-medium'
-                    : 'text-subtext0 hover:text-blue'
-                }`}
-            >
-              <ChevronRight 
-                className={`h-4 w-4 mr-2 transition-colors
+    <div className="bg-surface0/30 rounded-lg p-4 backdrop-blur-sm">
+      <h2 className="text-lg font-semibold text-text mb-4 px-2">
+        Table of Contents
+      </h2>
+      <nav className="text-sm">
+        <ul className="space-y-1">
+          {headers.map((header) => (
+            <li key={header.id}>
+              <button
+                onClick={() => scrollToHeader(header.id)}
+                className={`group flex items-center w-full px-2 py-2 rounded-md transition-all
                   ${
                     activeId === header.id
-                      ? 'text-blue'
-                      : 'text-surface0 group-hover:text-blue'
+                      ? 'bg-blue/10 text-blue font-medium'
+                      : 'text-subtext0 hover:bg-surface0/50 hover:text-text'
                   }`}
-              />
-              <span className="line-clamp-2">{header.title}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </nav>
+              >
+                <ChevronRight
+                  className={`h-4 w-4 mr-2 transition-transform
+                    ${
+                      activeId === header.id
+                        ? 'text-blue transform rotate-90'
+                        : 'text-surface1 group-hover:text-text'
+                    }`}
+                />
+                <span className="line-clamp-2">{header.title}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </div>
   );
 };
 
