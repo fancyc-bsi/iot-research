@@ -104,9 +104,9 @@ export default async function Post({ params }: Props) {
       </div>
 
       <div className="flex flex-col lg:flex-row">
-        <aside className="hidden lg:block w-96 sticky top-16 h-[calc(100vh-4rem)] shrink-0 overflow-y-auto border-r border-surface0/50 p-6">
-          <TableOfContents content={content} />
-        </aside>
+      <aside className="hidden lg:block w-[320px] sticky top-16 h-[calc(100vh-4rem)] shrink-0 overflow-y-auto border-r border-surface0/50 p-6">
+        <TableOfContents content={content} />
+      </aside>
 
         {/* Main Content */}
         {/* <main className="flex-1 min-w-0"> */}
