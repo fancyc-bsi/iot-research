@@ -111,7 +111,7 @@ export default async function Post({ params }: Props) {
         {/* Main Content */}
         {/* <main className="flex-1 min-w-0"> */}
         <main className="flex-1 px-6 py-12">
-          <article className="max-w-4xl mx-auto px-6 lg:px-16 py-12">
+          <article className="max-w-6xl mx-auto px-6 lg:px-8 py-12">
             <div className="prose prose-invert prose-lg max-w-none 
               prose-headings:text-text 
               prose-headings:font-semibold
