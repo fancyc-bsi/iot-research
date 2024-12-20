@@ -349,6 +349,7 @@ the current assumption is that the device running the mobile app will broadcast 
 ![[Pasted image 20241211091603.png]]
 
 I got blocked, which is impressive - I restarted my router to get a new public IP, which fixed the issue:
+
 ![[Pasted image 20241211093505.png]]
 
 After analysis of the wireshark traffic, the conclusion I came to is that the app running on the phone will initate a series of UDP broadcasts and a unique token every time.
@@ -386,8 +387,6 @@ password == mypassword
 token == AZmlpVZzkN_dHy
 SSID == starship
 ```
-
-I have no attempted to see how the device is waiting for the UDP broadcast yet, but will attempt to do so.
 ---
 
 # Drozer
