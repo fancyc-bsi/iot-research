@@ -326,22 +326,11 @@ modifying /tmp/wifi_info.ini
 
 ![[Pasted image 20241210093344.png]]
 
-```sh
-sort_rev_data: 0x00d2 0x0080 0x010a 0x016d 0x0179 0x0170
-sort_rev_data: 0x00c1 0x0081 0x0161 0x0173 0x0173 0x0177
-sort_rev_data: 0x00d7 0x0082 0x016f 0x0172 0x0164 0x010e
-sort_rev_data: 0x00a5 0x0083 0x0141 0x015a 0x016d 0x016c
-sort_rev_data: 0x008b 0x0084 0x0170 0x0156 0x015a 0x017a
-sort_rev_data: 0x00f8 0x0085 0x016b 0x014e 0x015f 0x0164
-sort_rev_data: 0x00fb 0x0086 0x0148 0x0179 0x0173 0x0174
-sort_rev_data: 0x00aa 0x0087 0x0161 0x0172 0x0173 0x0168
-```
-
 ---
 
 # UDP 
-'ALTOBEAM'
-sometimes the following will be triggered:
+
+Sometimes the following will be triggered:
 
 ```sh
 sort_rev_data: 0x00d2 0x0080 0x010a 0x016d 0x0179 0x0170
@@ -356,20 +345,49 @@ sort_rev_data: 0x00aa 0x0087 0x0161 0x0172 0x0173 0x0168
 
 the current assumption is that the device running the mobile app will broadcast the ssid, token and password of the wifi network, and sees if the camera responds to the pairing request
 
-however, the above packets dont show up everytime....
-
 
 ![[Pasted image 20241211091603.png]]
 
 I got blocked, which is impressive - I restarted my router to get a new public IP, which fixed the issue:
 ![[Pasted image 20241211093505.png]]
 
+After analysis of the wireshark traffic, the conclusion I came to is that the app running on the phone will initate a series of UDP broadcasts and a unique token every time.
+
+The camera is listening for this broadcast via the anyka_ipc binary, as the above packets decode into my test network SSID and password, along with a token.
+As shown here:
+
 ```sh
-[00:00:05.179|  info|  TUYA  ] TUYA UUid: szjsa682f393a1544949
-[00:00:05.179|  info|  TUYA  ] TUYA authkey: IK8ZcGo10bXqrOQ2k9PjnqyqnAdhY2fg
-[00:00:05.179|  info|  TUYA  ] TUYA pid: k1okbbubwccmdcaq
+Decoding data...
+
+Attempt 1 - Basic shift decode:
+
+myp
+assw
+ord
+AZml
+pVZz
+kN_d
+Hyst
+arsh
+
+Attempt 2 - Combined string:
+
+mypasswordAZmlpVZzkN_dHystarship
+
+Attempt 3 - Column-wise decode:
+Column 2:
+aoApkHa
+Column 3: msrZVNyr
+Column 4: ysdmZ_ss
+Column 5: pwlzdth
+
+Final string:
+password == mypassword
+token == AZmlpVZzkN_dHy
+SSID == starship
 ```
 
+I have no attempted to see how the device is waiting for the UDP broadcast yet, but will attempt to do so.
 ---
 
 # Drozer
@@ -457,7 +475,7 @@ extract from tuyasmart_l
 ---
 
 
-# The mobile app
+# Attacking the Mobile App
 
 ![[Pasted image 20241210175413.png]]
 
@@ -588,11 +606,6 @@ adb install final-mod-app.apk
 
 ---
 
-# Profit
-
-![[Pasted image 20241209135656.png]]
-
-
 ![[Pasted image 20241210210034.png]]
 
 ## Attacking the app - finding the correct version
@@ -689,10 +702,7 @@ sort_rev_data: 0x00d2 0x0088 0x0169 0x0170 0x0100 0x0100
 ```
 
 
-nothing sees to match this packet data, so if its not being sent from the app, or over bluetooth where? 
-
-
-Lets analyze the udp traffic...
+nothing seems to match this packet data, so if its not being sent from the app, or over bluetooth - then it must be sent over UDP. 
 
 ---
 
@@ -749,67 +759,7 @@ Address: 3.33.239.251
 
 ```
 
-## need to try
-
-https://github.com/guino/Merkury720
-https://www.reddit.com/r/geeni/comments/uv8laf/easily_unlockroot_your_geenituyamerkury_ip/
-
-https://github.com/guino/Geeni720P
-
-![[Pasted image 20241208235804.png]]
-
-
-
-### Simple wifi connect
-```sh
-lv_wifi_connect.sh starship mypassword
-```
-
-
-
 ## Dockerfile for compiling busybox
-
-```sh
-FROM debian:bullseye-slim
-
-# Install necessary packages
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    wget \
-    gcc-arm-linux-gnueabi \
-    libc6-dev-armel-cross \
-    qemu-user \
-    make \
-    libncurses-dev \
-    && apt-get clean
-
-# Set the working directory
-WORKDIR /busybox
-
-# Download BusyBox source
-RUN wget https://busybox.net/downloads/busybox-1.36.0.tar.bz2 && \
-    tar xvf busybox-1.36.0.tar.bz2 && \
-    rm busybox-1.36.0.tar.bz2
-
-# Set the working directory to the BusyBox source
-WORKDIR /busybox/busybox-1.36.0
-
-# Set environment for cross-compilation
-ENV ARCH=arm
-ENV CROSS_COMPILE=arm-linux-gnueabi-
-
-# Default command to configure and build BusyBox
-CMD ["sh", "-c", "make defconfig && make LDFLAGS='-static' -j$(nproc) && cp busybox /output"]
-
-```
-
-```sh
-docker build -t busybox-arm-builder .
-```
-
-```bash
-docker run --rm -v "$(pwd)/output:/output" busybox-arm-builder
-```
 
 ![[Pasted image 20241207225104.png]]
 
@@ -821,3 +771,123 @@ full busybox functionality
 confirming mitmproxy is working
 
 ---
+
+# Monitoring the Filesystem
+
+We create a simple binary that will run on the device, it will monitor any file changes during the anyka_ipc runtime.
+
+![[Pasted image 20241219131515.png]](All files written during anyka_ipc runtime)
+
+From the results we notice that the certificate is not being written to the filesystem at any point 
+
+The next step is to see if we can put anyka_ipc into debug mode - as it appears sensitive info might be displayed if this is added.
+
+we search for 'simplekv' in ghidra to better understand how to key is being obtained.
+
+```sh
+hexdump -C ./3B3000/jffs2-root/tuya_user.db
+
+00000000  48 b7 ff 32 02 00 00 00  0a 00 00 00 1c 70 00 00  |H..2.........p..|
+00000010  aa 55 aa 55 00 02 00 00  08 00 00 00 01 00 00 00  |.U.U............|
+00000020  67 77 5f 62 69 00 00 00  00 00 00 00 00 00 00 00  |gw_bi...........|
+00000030  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000040  00 00 00 00 04 01 00 00  1c 70 00 00 c0 00 00 00  |.........p......|
+00000050  c0 ec b1 07 01 00 00 00  67 77 5f 77 73 6d 00 00  |........gw_wsm..|
+00000060  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000070  00 00 00 00 00 00 00 00  00 00 00 00 d4 00 00 00  |................|
+00000080  20 71 00 00 90 00 00 00  4c 6f 1f 73 01 00 00 00  | q......Lo.s....|
+00000090  67 77 5f 64 69 00 00 00  00 00 00 00 00 00 00 00  |gw_di...........|
+000000a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000000b0  00 00 00 00 d4 01 00 00  f4 71 00 00 90 01 00 00  |.........q......|
+000000c0  1a 28 92 00 01 00 00 00  77 66 5f 73 74 61 72 74  |.(......wf_start|
+000000d0  5f 6d 64 00 00 00 00 00  00 00 00 00 00 00 00 00  |_md.............|
+000000e0  00 00 00 00 00 00 00 00  00 00 00 00 54 00 00 00  |............T...|
+000000f0  c8 73 00 00 10 00 00 00  69 41 97 b3 01 00 00 00  |.s......iA......|
+00000100  67 77 5f 61 69 00 00 00  00 00 00 00 00 00 00 00  |gw_ai...........|
+00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000120  00 00 00 00 b4 01 00 00  1c 74 00 00 70 01 00 00  |.........t..p...|
+00000130  36 5d a7 fd 01 00 00 00  70 32 70 5f 61 75 74 68  |6]......p2p_auth|
+00000140  5f 69 6e 66 6f 00 00 00  00 00 00 00 00 00 00 00  |_info...........|
+00000150  00 00 00 00 00 00 00 00  00 00 00 00 54 00 00 00  |............T...|
+00000160  d0 75 00 00 10 00 00 00  e6 02 d6 8d 01 00 00 00  |.u..............|
+00000170  70 32 70 5f 70 77 64 00  00 00 00 00 00 00 00 00  |p2p_pwd.........|
+00000180  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000190  00 00 00 00 54 00 00 00  24 76 00 00 10 00 00 00  |....T...$v......|
+000001a0  e6 02 d6 8d 01 00 00 00  70 32 70 5f 74 79 70 65  |........p2p_type|
+000001b0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000001c0  00 00 00 00 00 00 00 00  00 00 00 00 54 00 00 00  |............T...|
+000001d0  78 76 00 00 10 00 00 00  e6 02 d6 8d 00 00 00 00  |xv..............|
+000001e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+```
+
+we edit the log level fields in /etc/config/anyka_cfg.ini
+```sh
+sed -i 's/anyka_log_level.*=.*2/anyka_log_level                = 5/' anyka_cfg.ini
+sed -i 's/iot_log_level.*=.*0/iot_log_level                = 5/' anyka_cfg.ini
+sed -i 's/lv_log_level.*=.*0/lv_log_level                = 5/' anyka_cfg.ini
+```
+
+Now we are seeing new log messages with debugging enabled
+```sh
+[01-01 18:12:15 TUYA D][tuya_ws_db.c:450] init fs. Path: /etc/config/
+[01-01 18:12:15 TUYA I][kv_storge.c:45] Init Kvs With File:/etc/config/
+[01-01 18:12:15 TUYA D][simplekv.c:945] path:/etc/config/
+[01-01 18:12:15 TUYA D][simplekv.c:981] get encrypt_key[US�ykR�]
+[01-01 18:12:15 TUYA D][simplekv.c:1012] both file exist
+[01-01 18:12:15 TUYA D][simplekv.c:310] size in: 0 and final: 28700 And mag_rec_max: 512
+[01-01 18:12:15 TUYA D][simplekv.c:325] create data hd success
+[01-01 18:12:15 TUYA D][simplekv.c:1055] read from normal file
+[01-01 18:12:15 TUYA D][simplekv.c:765] curr db is V2. No need to upgrade
+[01-01 18:12:15 TUYA D][simplekv.c:555] head check success
+[01-01 18:12:15 TUYA D][simplekv.c:658] read and check head success
+[01-01 18:12:15 TUYA D][simplekv.c:1075] read from normal file success
+[01-01 18:12:15 TUYA I][uni_thread.c:228] thread_create name:sys_timer,stackDepth:4096,totalstackDepth:4096,priority:5
+[01-01 18:12:15 TUYA D][simplekv.c:1111] init from normal file success.
+[01-01 18:12:15 TUYA I][mqc_app.c:350] mqc app init ...
+[01-01 18:12:15 TUYA I][uni_thread.c:228] thread_create name:cmmod,stackDepth:4096,totalstackDepth:8192,priority:4
+[01-01 18:12:15 TUYA D][mqc_app.c:144] mq_pro:5 cnt:1
+[01-01 18:12:15 TUYA D][mqc_app.c:144] mq_pro:31 cnt:2
+[01-01 18:12:15 TUYA D][svc_online_log.c:295] svc online log init success
+New file detected: /tmp/log_seq_stat
+Copied /tmp/log_seq_stat to /tmp/_files/log_seq_stat
+New file detected: /tmp/_files/log_seq_stat
+Copied /tmp/_files/log_seq_stat to /tmp/_files/log_seq_stat
+Dbg:tuya_ipc_sdk_mqtt_online_proc thread start success
+
+[01-01 18:12:15 TUYA D][uni_thread.c:250] Thread:sys_timer Exec Start. Set to Running Stat
+[01-01 18:12:15 TUYA D][uni_thread.c:250] Thread:cmmod Exec Start. Set to Running Stat
+[01-01 18:12:15 TUYA E][log_seq.c:871] logseq empty
+[01-01 18:12:15 TUYA I][uni_thread.c:228] thread_create name:wk_th-0,stackDepth:5120,totalstackDepth:13312,priority:3
+Dbg:init ring buffer Channel:0 Enable:1
+Dbg:video_bitrate 1536, video_fps 15
+Dbg:init ring buffer success. channel:0
+Dbg:init ring buffer Channel:1 Enable:1
+Dbg:video_bitrate 512, video_fps 15
+Dbg:init ring buffer success. channel:1
+Dbg:init ring buffer Channel:2 Enable:0
+Dbg:init ring buffer Channel:3 Enable:0
+Dbg:init ring buffer Channel:4 Enable:0
+Dbg:init ring buffer Channel:5 Enable:0
+Dbg:init ring buffer Channel:6 Enable:0
+Dbg:init ring buffer Channel:7 Enable:0
+Dbg:init ring buffer Channel:8 Enable:0
+Dbg:init ring buffer Channel:9 Enable:1
+Dbg:audio_sample 8000, audio_databits 16, audio_fps 25
+Dbg:init ring buffer success. channel:9
+Dbg:init ring buffer Channel:10 Enable:0
+Dbg:init ring buffer Channel:11 Enable:0
+Dbg:init ring buffer Channel:12 Enable:0
+Dbg:init ring buffer Channel:13 Enable:0
+Dbg:init ring buffer Channel:14 Enable:0
+Dbg:init ring buffer Channel:15 Enable:0
+```
+
+Sadly, after inspecting the anyka_ipc binary some more, we find it is not dynamically linked, so LD-Preloading will not work. 
+
+Additionally, the following methods will not work:
+
+[-] Building a custom version of gdb => the camera does not support debugging in the kernel
+[-] Strace => same reason as above
+[-] File monitor => the binary has certificates and encryption keys embedded in the binary, it never writes them to a temp file during execution
+
+What would potentially work is decompiling the binary with ghidra, making some edits and repacking it. But that will be out of scope for now.
