@@ -375,13 +375,6 @@ Attempt 2 - Combined string:
 
 mypasswordAZmlpVZzkN_dHystarship
 
-Attempt 3 - Column-wise decode:
-Column 2:
-aoApkHa
-Column 3: msrZVNyr
-Column 4: ysdmZ_ss
-Column 5: pwlzdth
-
 Final string:
 password == mypassword
 token == AZmlpVZzkN_dHy
@@ -885,8 +878,28 @@ Sadly, after inspecting the anyka_ipc binary some more, we find it is not dynami
 
 Additionally, the following methods will not work:
 
+```rust
 [-] Building a custom version of gdb => the camera does not support debugging in the kernel
 [-] Strace => same reason as above
 [-] File monitor => the binary has certificates and encryption keys embedded in the binary, it never writes them to a temp file during execution
+```
 
-What would potentially work is decompiling the binary with ghidra, making some edits and repacking it. But that will be out of scope for now.
+What would potentially work is decompiling the binary with ghidra, making some edits and repacking it - that will be out of scope for now.
+
+# Conclusion
+Overallm I was surprised to see all the security messures on this device and mobile application. 
+
+There were a lot measures in place preventing me from attacking the cloud application or decrypting any of the databases
+
+as a quick summary, I was able to accomplish the following:
+
+```rust
+[+] Obtain root access over the device 
+[+] "Fix" the device to be able to pair properly 
+[+] Decompile and review the sourcecode of the main entrypoint "anyka_ipc"
+[+] SSL pinning attack on the mobile app 
+[+] Create an auto-exploit script to gain a telnet shell on the device via UART
+[+] Connect the device to my test network and review all the network traffic
+```
+
+Thanks for reading!
