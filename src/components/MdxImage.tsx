@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { useRouter } from 'next/router';
+import { usePathname } from 'next/navigation';
 
 interface MdxImageProps {
   src: string;
@@ -9,8 +9,8 @@ interface MdxImageProps {
 }
 
 const MdxImage = ({ src, alt = '', className = '', postSlug }: MdxImageProps) => {
-  const router = useRouter();
-  const slug = postSlug || router.query.postSlug;
+  const pathname = usePathname();
+  const slug = postSlug || pathname.split('/').pop();
 
   const getImagePath = (src: string) => {
     // console.log("Original src:", src);
