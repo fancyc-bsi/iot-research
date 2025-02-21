@@ -4,7 +4,7 @@ import matter from 'gray-matter';
 import { MDXRemote } from 'next-mdx-remote/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
 import React from 'react';
-import { useRouter } from 'next/router';
+import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import TableOfContents from '@/components/TableOfContents';
 import type { BundledLanguage } from 'shiki';
@@ -79,8 +79,8 @@ const parseImageContent = (content: string): ImageData => {
 };
 
 const ObsidianImage = ({ content, postSlug }: { content: string; postSlug?: string }) => {
-  const router = useRouter();
-  const slug = postSlug || router.query.postSlug; // Dynamically get the correct post slug
+  const pathname = usePathname();
+  const slug = postSlug || pathname.split('/').pop();
 
   const { imageName, caption } = parseImageContent(content);
   const imagePath = `/iot-research/images/posts/${slug}/${imageName}`;
