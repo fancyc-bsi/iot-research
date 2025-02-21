@@ -1,0 +1,381 @@
+# Intro
+
+In this article, I'll discuss the various methods of exploitation during IOT pentesting. With this device, I was able to obtain a root shell, the root password and also found the device was not checking certificates, I was able to freely view the traffic going to/from the connected cloud server as well as reconstruct photos taken by the device without any authentication. The main sections are listed to the left in the table of contents, hope you enjoy the read!
+
+A quick rundown of the methodology used in this article:
+- Visual inspection and component identification
+- UART transmission analysis
+- Firmware extraction/modification
+- Obtaining a root shell
+- Reviewing network communications from/to the device 
+- Inspecting open ports
+- Review cloud server traffic 
+- Attempt to reverse engineer critical binaries
+- Bypass SSL pinning or integrity checks on the mobile app to view cleartext traffic
+
+# Serial Connection
+
+![[Pasted image 20250216155326.png]]
+
+Below are the labeled RX and TX connections as well as ground, I've connected my probes to them and attached the device to my usb to serial adapter.
+
+![[Pasted image 20250216155435.png]]
+
+
+#### Getting a root Shell
+This device doesn't have a login prompt or anything, so we are able to obtain a root shell right away without much effort.
+
+```sh
+picocom -b 115200 /dev/ttyUSB0
+```
+
+![[Pasted image 20250115233416.png]]
+
+As shown above, we get some system boot info and also I'm pressing "enter" at the same time, which shows us as the root user, we also notice that a log message worth checking out.
+
+```sh
+Server started, listening on port 8888...
+```
+I'll boot up my test network and get this device on it, but first its good to poke around the system pre-pair to familiarize ourselves with how the device functions. 
+
+Before we proceed, since I don't have a copy of the firmware yet I want to quickly poke around the file system, starting off with the shadow and passwd files, I print them to my terminal and copy them over the my machine, then I unshadow the files to get a john/hashcat friendly hash.
+
+![[Pasted image 20250203214033.png]]
+
+As shown above, the password is simply 'tina' which is the flavor of openWRT running on this device. This will come in handy later if we need to use telnet or ssh to login to the device instead of serial.
+
+I found the following script in /init.d/adbd which I initially suspected to not be the same as android debug bridge, however on closer inspection, it looks like a shell script wrapper for the adb server 
+
+```sh
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2006-2011 OpenWrt.org
+
+START=80
+STOP=99
+
+USE_PROCD=1
+PROG=/bin/adbd
+OOM_ADJ=-17
+#ADB_TRANSPORT_PORT=5555
+SERIALNUMBER="20080411"
+
+get_serialnumber() {
+	str=`cat /proc/cmdline |tr ' ' '\n' | grep 'androidboot.serialno' | awk -F "=" '{print $2}'`
+	[ -z $str ] || SERIALNUMBER=$str
+}
+
+start_service() {
+	[ -e /bin/setusbconfig ] && {
+		/bin/setusbconfig adb
+	}
+	[ -d /sys/kernel/config/usb_gadget ] || {
+		mount -t configfs none /sys/kernel/config
+		mkdir /sys/kernel/config/usb_gadget/g1
+		echo "0x18d1" > /sys/kernel/config/usb_gadget/g1/idVendor
+		echo "0xD002" > /sys/kernel/config/usb_gadget/g1/idProduct
+		mkdir /sys/kernel/config/usb_gadget/g1/strings/0x409
+		echo "Allwinner" > /sys/kernel/config/usb_gadget/g1/strings/0x409/manufacturer
+		echo "Tina" > /sys/kernel/config/usb_gadget/g1/strings/0x409/product
+	}
+	[ -d /sys/kernel/config/usb_gadget/g1/configs/c.1 ] || {
+		mkdir /sys/kernel/config/usb_gadget/g1/configs/c.1
+		echo 0xc0 > /sys/kernel/config/usb_gadget/g1/configs/c.1/bmAttributes
+		echo 500 > /sys/kernel/config/usb_gadget/g1/configs/c.1/MaxPower
+		mkdir /sys/kernel/config/usb_gadget/g1/configs/c.1/strings/0x409
+	}
+	[ -d /sys/kernel/config/usb_gadget/g1/functions/ffs.adb ] || {
+		mkdir /sys/kernel/config/usb_gadget/g1/functions/ffs.adb
+	}
+	[ -e /sys/kernel/config/usb_gadget/g1/configs/c.1/ffs.adb ] || {
+		ln -s /sys/kernel/config/usb_gadget/g1/functions/ffs.adb/ /sys/kernel/config/usb_gadget/g1/configs/c.1/ffs.adb
+	}
+	[ -d /dev/usb-ffs/adb ] || {
+		mkdir /dev/usb-ffs
+		mkdir /dev/usb-ffs/adb
+		mount -o uid=2000,gid=2000 -t functionfs adb /dev/usb-ffs/adb/
+	}
+	get_serialnumber
+	echo $SERIALNUMBER > /sys/kernel/config/usb_gadget/g1/strings/0x409/serialnumber
+	procd_open_instance
+	procd_set_param oom_score_adj $OOM_ADJ
+	[ -n $ADB_TRANSPORT_PORT ] && {
+		procd_set_param env ADB_TRANSPORT_PORT="$ADB_TRANSPORT_PORT"
+	}
+	procd_set_param command $PROG -D
+	procd_close_instance
+}
+
+shutdown() {
+	echo shutdown
+}
+
+```
+
+So I start  /bin/adbd and sure enough I can access the root shell of the system through ADB on my host machine 
+
+![[Pasted image 20250203215506.png]]
+
+Now we don't need to worry about serial messages blocking our recon of the device. Currently it does not appear to be running telnet or any other remote login service. 
+
+From the ps output, it appears this is the entry point application 
+
+![[Pasted image 20250203220500.png]]
+We pull it from the device for binary analysis. This concludes our initial recon 
+
+# Firmware Analysis 
+
+#fixme intro about how i got the firmware
+
+
+![[Pasted image 20250216173756.png]]
+
+![[Pasted image 20250216175720.png]]
+
+Another reminder to always wipe your devices before getting rid of them.
+
+Looks like at the very least our username for the mobile app isn't being stored on the device 
+![[Pasted image 20250216180043.png]]
+Nothing really sticking out other than custom binaries that we will reverse engineer in the next section. 
+
+# Binary Analysis
+
+We will be exploring the "ciapp" application and how it functions, using ghidra. 
+#fixme 
+# Pairing the Device 
+
+We pair the device successfully and monitor the traffic in wireshark, nothing out of the ordinary here, using bluetooth to find the device and then prompts you for your wifi network credentials. Within the app on my rooted android device you can view the live video feed, without initializing this connection, the device appears to be in a constant state of rebooting. So we boot up mitmproxy and see if we can intercept any traffic before trying to inject our own.
+
+![[Pasted image 20250203222857.png]]
+
+As we can see, the iot device is blindly accepting our mitmproxy certificate without any firmware modification, we can now view and intercept the live feed data being transmitted.
+
+Here is a closer look at the requests.
+
+![[Pasted image 20250203223244.png]]
+
+Burp seems to not be getting all the request data, so we switch to mitmweb.
+
+```sh
+mitmweb --mode transparent --showhost -p 8081 -k --set web_port=9000
+```
+
+Looks like the device is storing and uploading screenshots, but we don't have the permissions to view it currently
+
+![[Pasted image 20250203223146.png]]
+
+We intercept the request and see if we have a cookie set or jwt 
+![[Pasted image 20250203223909.png]]
+
+Now lets see if we can use that header to view the jpg
+```
+curl -X GET "https://usw-aiwit.oss-us-west-1.aliyuncs.com/EKDB_08EFBE1B-0DF9-271B-F3DD-3479A1C65F6A/20250203/20250203222621.jpg" \
+  -H "Host: usw-aiwit.oss-us-west-1.aliyuncs.com" \
+  -H "Date: Tue, 04 Feb 2025 02:35:51 GMT" \
+  -H "Authorization: OSS LTAI5tAXN18rhmbbkKrXSFQT:JW6Z9GfvORkIM82F9ZLNFxpt/NI=" \
+  -H "Content-Length: 28340" \
+  -H "Content-Type: application/octet-stream" \
+  -H "Connection: keep-alive"
+```
+
+![[Pasted image 20250203225218.png]]
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+  <Code>SignatureDoesNotMatch</Code>
+  <Message>The request signature we calculated does not match the signature you provided. Check your key and signing method.</Message>
+  <RequestId>67A17E9FD561043835D9CF28</RequestId>
+  <HostId>usw-aiwit.oss-us-west-1.aliyuncs.com</HostId>
+  <OSSAccessKeyId>LTAI5tAXN18rhmbbkKrXSFQT</OSSAccessKeyId>
+  <SignatureProvided>JW6Z9GfvORkIM82F9ZLNFxpt/NI=</SignatureProvided>
+  <StringToSign>GET
+
+application/octet-stream
+Tue, 04 Feb 2025 02:35:51 GMT
+/usw-aiwit/EKDB_08EFBE1B-0DF9-271B-F3DD-3479A1C65F6A/20250203/20250203222621.jpg</StringToSign>
+  <StringToSignBytes>47 45 54 0A 0A 61 70 70 6C 69 63 61 74 69 6F 6E 2F 6F 63 74 65 74 2D 73 74 72 65 61 6D 0A 54 75 65 2C 20 30 34 20 46 65 62 20 32 30 32 35 20 30 32 3A 33 35 3A 35 31 20 47 4D 54 0A 2F 75 73 77 2D 61 69 77 69 74 2F 45 4B 44 42 5F 30 38 45 46 42 45 31 42 2D 30 44 46 39 2D 32 37 31 42 2D 46 33 44 44 2D 33 34 37 39 41 31 43 36 35 46 36 41 2F 32 30 32 35 30 32 30 33 2F 32 30 32 35 30 32 30 33 32 32 32 36 32 31 2E 6A 70 67 </StringToSignBytes>
+  <EC>0002-00000040</EC>
+  <RecommendDoc>https://api.alibabacloud.com/troubleshoot?q=0002-00000040</RecommendDoc>
+</Error>
+
+
+[osi@verison1 occuwave]$ curl -X GET "https://usw-aiwit-file-push.oss-us-west-1.aliyuncs.com/20250203/2249/224901_262836907_EKDB_08EFBE1B-0DF9-271B-F3DD-3479A1C65F6A.jpg" \
+  -H "Host: usw-aiwit-file-push.oss-us-west-1.aliyuncs.com" \
+  -H "Date: Tue, 04 Feb 2025 02:49:01 GMT" \
+  -H "Authorization: OSS LTAI5tAXN18rhmbbkKrXSFQT:CVamL5DfYoz3uQXftTE2whzxgaI="
+<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+  <Code>SignatureDoesNotMatch</Code>
+  <Message>The request signature we calculated does not match the signature you provided. Check your key and signing method.</Message>
+  <RequestId>67A18092C3F245333482546B</RequestId>
+  <HostId>usw-aiwit-file-push.oss-us-west-1.aliyuncs.com</HostId>
+  <OSSAccessKeyId>LTAI5tAXN18rhmbbkKrXSFQT</OSSAccessKeyId>
+  <SignatureProvided>CVamL5DfYoz3uQXftTE2whzxgaI=</SignatureProvided>
+  <StringToSign>GET
+
+
+Tue, 04 Feb 2025 02:49:01 GMT
+/usw-aiwit-file-push/20250203/2249/224901_262836907_EKDB_08EFBE1B-0DF9-271B-F3DD-3479A1C65F6A.jpg</StringToSign>
+  <StringToSignBytes>47 45 54 0A 0A 0A 54 75 65 2C 20 30 34 20 46 65 62 20 32 30 32 35 20 30 32 3A 34 39 3A 30 31 20 47 4D 54 0A 2F 75 73 77 2D 61 69 77 69 74 2D 66 69 6C 65 2D 70 75 73 68 2F 32 30 32 35 30 32 30 33 2F 32 32 34 39 2F 32 32 34 39 30 31 5F 32 36 32 38 33 36 39 30 37 5F 45 4B 44 42 5F 30 38 45 46 42 45 31 42 2D 30 44 46 39 2D 32 37 31 42 2D 46 33 44 44 2D 33 34 37 39 41 31 43 36 35 46 36 41 2E 6A 70 67 </StringToSignBytes>
+  <EC>0002-00000040</EC>
+  <RecommendDoc>https://api.alibabacloud.com/troubleshoot?q=0002-00000040</RecommendDoc>
+</Error>
+
+```
+
+So it looks like once the file has been uploaded to the cloud servers it is now theirs and even with the original token for the PUT request you cannot view the image, however we can reform the hexdump data from mitmproxy and see what jpeg they took from us.
+
+Below is a script made to convert the hexdump data into a jpeg.
+
+```python
+#!/usr/bin/env python3
+import re
+import sys
+
+def parse_hexdump(input_text):
+    binary_data = bytearray()
+    
+    # Regular expression to match hex values, excluding address and ASCII portion
+    # Matches format: 0000000270 24 fb 8b 41 ...
+    hex_pattern = re.compile(r'^\s*[0-9a-fA-F]+\s+((?:[0-9a-fA-F]{2}\s+){1,16})')
+    
+    for line in input_text.split('\n'):
+        if not line.strip():
+            continue
+            
+        match = hex_pattern.match(line)
+        if match:
+            # Get the hex values portion
+            hex_values = match.group(1).strip()
+            
+            # Convert hex strings to bytes
+            for hex_val in hex_values.split():
+                try:
+                    binary_data.append(int(hex_val, 16))
+                except ValueError:
+                    continue
+    
+    return binary_data
+
+def convert_hexdump_to_file(input_text, output_file):
+    try:
+        binary_data = parse_hexdump(input_text)
+        
+        # Check if we have valid JPEG header
+        if binary_data[:2] != b'\xFF\xD8':
+            print("Warning: This doesn't appear to be a valid JPEG file (missing JPEG header)")
+            
+        # Write binary data to file
+        with open(output_file, 'wb') as f:
+            f.write(binary_data)
+            
+        print(f"Successfully wrote binary data to {output_file}")
+        
+    except Exception as e:
+        print(f"Error converting hexdump: {str(e)}")
+        return False
+        
+    return True
+
+if __name__ == "__main__":
+    with open('hexdump.txt', 'r') as f:
+        input_text = f.read()
+    convert_hexdump_to_file(input_text, "output.jpg")
+```
+
+With this, we can now view the output.jpg which matches the original data sent to the cloud servers.
+
+![[Pasted image 20250203231409.png]]
+
+This is just a pink screen due to me removing the camera, as I didn't trust this device from the start - but this matches the camera feed from the mobile app. This app makes you pay for cloud storage, but doesn't mind just taking the photos for you anyways :)
+
+![[Pasted image 20250216155027.png]]  
+
+## Exploring the Traffic Further
+
+![[Pasted image 20250206184731.png]]
+
+We setup our proxy to capture the device's initialization, hoping to spot servers it pulls data from or other sensitive data. We discover the reverse proxy server with a 'cmd_port' which looks interesting, lets investigate. 
+
+![[Pasted image 20250206184936.png]]
+
+Looking at the nmap results we see some interesting items 
+
+![[Pasted image 20250206185113.png]]
+
+focusing more on that cmd port lets try to generate a random UUID and use that 
+
+![[Pasted image 20250206190017.png]]
+
+seems like we need a valid login, but this time our command is at least reflected in the response.
+# SSL Pinning Bypass - Mobile app
+
+#fixme mobile app info
+
+![[Pasted image 20250203202115.png]]
+
+We pull and modify the apk to bypass SSL pinning, then install the apk back onto the device.
+
+![[Pasted image 20250203202416.png]]
+
+```sh
+adb install doorbell-patched.apk
+```
+
+Next, I enable my test network and connect my rooted android phone to it, with the intentions of pairing the device on the test network, this way I'll be able to see the traffic in wireshark while being segmented from my main network. I'm also running burp with the invisible proxy option on the same network interface I'm creating the test network on (br0).
+
+![[Pasted image 20250203203601.png]]
+
+Now we can see what the device tries to do during startup and within the pairing process.
+
+# Mobile App Exploitation
+
+We use drozer to view info about the mobile app such as exported services and activities we may be able to interact with. We can also check if the app is storing any sensitive info locally.
+
+```sh
+adb forward tcp:31415 tcp:31415
+```
+
+```sh
+drozer console connect
+```
+
+Once connected to drozer by starting the app on our rooted device, we can gather info using the below command:
+
+```sh
+run app.package.info -a com.seeing.doorbell
+```
+
+![[Pasted image 20250216160027.png]]
+
+Now we know the local storage location on the device as well as the version and package name.
+
+```sh
+run scanner.activity.browsable -a com.seeing.doorbell
+```
+![[Pasted image 20250216160446.png]]
+
+Doesn't seem to be much for us to go off here, so lets check for local storage.
+
+![[Pasted image 20250216161107.png]]
+
+Seems like there is some content, lets pull them from the device to see if any of them are useful.
+
+![[Pasted image 20250216161240.png]]
+
+I move all the files to the sdcard for easy transfer and not running into permission issues 
+```sh
+adb pull /sdcard/mbridge.msdk.db
+```
+
+```sh
+sqlitebrowser mbridge.msdk.db
+```
+
+Sadly no data was populated within these database files.
+
+# Conclusion
+
+This device followed very poor security practices, from not checking certificates to storing photos on their cloud servers without any authentication. This device is a prime example of why you should always wipe your devices before getting rid of them.
+Furthermore, the mobile app was not storing any sensitive information locally, but still allowed for easy bypass of SSL pinning.
+Lastly, the root password was easily cracked and the device was running an outdated version of openWRT.

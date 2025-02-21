@@ -79,7 +79,7 @@ During the uboot process, we interupt the device from completing the initalizati
    ```bash
    dtc -I dts -O dtb -o modified_dtb.bin original.dts
    ```
-> 💡 **Important Note**: The DTB modification must stay within the 45056 byte limit to maintain firmware integrity.
+> **Important Note**: The DTB modification must stay within the 45056 byte limit to maintain firmware integrity.
 
 5. **Create modified firmware**
    ```bash
@@ -193,11 +193,12 @@ picocom -b 115200 /dev/ttyUSB0
 
 ![[Pasted image 20241204210444.png]]
 
-!!TODO => replace with link
 ## Filter Script 
 
 After obtaining a root shell on the device, the terminal was extremely crowded with log messages.
 I created a script to filter out the noise and allow me to focus on the directory structure more clearly.
+
+- https://github.com/fancyc-bsi/iot-research/blob/main/tools/uart_filter.py
 
 ![[Pasted image 20241205145908.png]]
 
@@ -206,6 +207,12 @@ I created a script to filter out the noise and allow me to focus on the director
 ---
 
 # Fixing the camera
+
+I setup a isolated test network with rules that will auto-route HTTP and HTTPS traffic through my testing machine.
+
+- https://github.com/fancyc-bsi/iot-research/blob/main/tools/mitm.sh
+
+The goal is to connect the IOT device to my test network.
 
 ```bash
 ps aux --> search for : anyka_service.sh and anyka_ipc
@@ -249,16 +256,7 @@ we could not crack the root password - so we simply change the root password on 
 
 ## Running services 
 
-![[Pasted image 20241205160458.png]]
-
-telnet and anyka service 
-
-
-![[Pasted image 20241205160939.png]]
-
-strings output of ipc
-
-
+![[Pasted image 20241205160458.png]](telnet and anyka service) 
 
 ## Setup of the wifi
 ![[Pasted image 20241205162033.png]]
@@ -282,47 +280,17 @@ strings output of ipc
 
 ![[Pasted image 20241207172905.png]]
 
-
-
 ![[Pasted image 20241207191257.png]]
 
-
-
-![[Pasted image 20241207191417.png]]
-
-
-
-![[Pasted image 20241207191831.png]]
-
-modifying /tmp/wifi_info.ini
+![[Pasted image 20241207191831.png]](modifying /tmp/wifi_info.ini)
 
 ![[Pasted image 20241207193809.png]]
 
-
 ![[Pasted image 20241207195301.png]]
-
-
-![[Pasted image 20241207234310.png]]
-
-
-
-![[Pasted image 20241207215726.png]]
-
-
 
 ![[Pasted image 20241208110807.png]]
 
-
-## Decent to madness
-
-![[Pasted image 20241208223726.png]]
-
-
-![[Pasted image 20241208223757.png]]
-
-
-![[Pasted image 20241209132852.png]]
-
+# Attempting to View TLS Traffic
 
 ![[Pasted image 20241210093344.png]]
 
@@ -455,10 +423,12 @@ we pull the files from the device and browse the data:
 
 nothing here
 
-[-] mqttAndroidService.db -> not encrypted but empty
-[-] tuyasmart_encrypt.db -> encrypted
-[-] tuyasmart_l -> not encrypted, contains data but doesn't appear to be useful
-[-] ty_tracker.db -> not encrypted, contains useless data 
+```rust
+[-] mqttAndroidService.db => not encrypted but empty
+[-] tuyasmart_encrypt.db => encrypted
+[-] tuyasmart_l => not encrypted, contains data but doesn't appear to be useful
+[-] ty_tracker.db => not encrypted, contains useless data 
+```
 
 ![[Pasted image 20241211150532.png]]
 
