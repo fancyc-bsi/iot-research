@@ -37,7 +37,7 @@ const Navigation = () => {
                   About
                 </Link>
                 <a
-                  href="https://github.com"
+                  href="https://github.com/fancyc-bsi/iot-research"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-subtext0 hover:bg-surface0 hover:text-text px-3 py-2 rounded-md text-sm font-medium flex items-center"

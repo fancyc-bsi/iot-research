@@ -81,6 +81,7 @@ const parseImageContent = (content: string): ImageData => {
 const ObsidianImage = ({ content, postSlug }: { content: string; postSlug?: string }) => {
   const router = useRouter();
   const slug = postSlug || router.query.postSlug; // Dynamically get the correct post slug
+  console.log('Slug:', slug);
 
   const { imageName, caption } = parseImageContent(content);
   const imagePath = `/iot-research/images/posts/${slug}/${imageName}`;
