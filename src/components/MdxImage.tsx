@@ -14,23 +14,25 @@ const MdxImage = ({ src, alt = '', className = '', postSlug }: MdxImageProps) =>
 
   const getImagePath = (src: string) => {
     // Handle Obsidian-style pasted images
-    const obsidianMatch = src.match(/!\[\[Pasted image (\d{14})\.png\]\]/);
+    const obsidianMatch = src.match(/!\[\[\s*Pasted image (\d{14})\.png\s*\]\]/i);
     if (obsidianMatch) {
-      return `/iot-research/images/posts/${slug}/Pasted image ${obsidianMatch[1]}.png`;
+      const imageName = `Pasted image ${obsidianMatch[1]}.png`.replace(/ /g, '%20'); // Encode spaces
+      return `/iot-research/images/posts/${slug}/${imageName}`;
     }
-
+  
     // Handle standard Markdown format
     const markdownMatch = src.match(/!\[(.*?)\]\((.*?)\)/);
     if (markdownMatch) {
       return `/iot-research${markdownMatch[2]}`;
     }
-
+  
     if (src.startsWith('/') || src.startsWith('./') || src.startsWith('http')) {
-      return src.startsWith('/') ? `/iot-research${src}` : src;
+      return src.startsWith('/') ? `/iot-research${src.replace(/ /g, '%20')}` : src;
     }
-
-    return `/iot-research/images/posts/${slug}/${src}`;
+  
+    return `/iot-research/images/posts/${slug}/${src.replace(/ /g, '%20')}`;
   };
+  
 
   const imagePath = getImagePath(src);
 
