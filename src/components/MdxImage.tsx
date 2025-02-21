@@ -13,11 +13,12 @@ const MdxImage = ({ src, alt = '', className = '', postSlug }: MdxImageProps) =>
   const slug = postSlug || router.query.postSlug;
 
   const getImagePath = (src: string) => {
+    // console.log("Original src:", src);
+  
     // Handle Obsidian-style pasted images
     const obsidianMatch = src.match(/!\[\[\s*Pasted image (\d{14})\.png\s*\]\]/i);
     if (obsidianMatch) {
-      const imageName = `Pasted image ${obsidianMatch[1]}.png`.replace(/ /g, '%20'); // Encode spaces
-      return `/iot-research/images/posts/${slug}/${imageName}`;
+      return `/iot-research/images/posts/${slug}/Pasted image ${obsidianMatch[1]}.png`;
     }
   
     // Handle standard Markdown format
@@ -26,12 +27,15 @@ const MdxImage = ({ src, alt = '', className = '', postSlug }: MdxImageProps) =>
       return `/iot-research${markdownMatch[2]}`;
     }
   
+    // Ensure correct prefix for direct src values
     if (src.startsWith('/') || src.startsWith('./') || src.startsWith('http')) {
-      return src.startsWith('/') ? `/iot-research${src.replace(/ /g, '%20')}` : src;
+      return src.startsWith('/') ? `/iot-research${src}` : src;
     }
   
-    return `/iot-research/images/posts/${slug}/${src.replace(/ /g, '%20')}`;
+    // Default to ensuring the proper base path
+    return `/iot-research/images/posts/${slug}/${src}`;
   };
+  
   
 
   const imagePath = getImagePath(src);
