@@ -81,7 +81,6 @@ const parseImageContent = (content: string): ImageData => {
 const ObsidianImage = ({ content, postSlug }: { content: string; postSlug?: string }) => {
   const router = useRouter();
   const slug = postSlug || router.query.postSlug; // Dynamically get the correct post slug
-  console.log('Slug:', slug);
 
   const { imageName, caption } = parseImageContent(content);
   const imagePath = `/iot-research/images/posts/${slug}/${imageName}`;
@@ -122,7 +121,7 @@ const ImageContainer = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-export const mdxComponents = {
+export const mdxComponents = (resolvedParams: { slug: string }) => ({
   h1: ({ children }: HeadingProps) => {
     const id = slugify(children?.toString() || '');
     return (
@@ -150,7 +149,7 @@ export const mdxComponents = {
   p: ({ children }: ParagraphProps) => {
     if (typeof children === 'string') {
       if (children.startsWith('![[')) {
-        return <ObsidianImage content={children} />;
+        return <ObsidianImage content={children} postSlug={resolvedParams.slug} />;
       }
       return <p className="my-6 leading-relaxed text-subtext0">{children}</p>;
     }
@@ -164,7 +163,7 @@ export const mdxComponents = {
           <ImageContainer>
             {children.map((child, index) => {
               if (typeof child === 'string' && child.startsWith('![[')) {
-                return <ObsidianImage key={index} content={child} />;
+                return <ObsidianImage key={index} content={child} postSlug={resolvedParams.slug} />;
               }
               return child;
             })}
@@ -175,7 +174,7 @@ export const mdxComponents = {
 
     return <p className="my-6 leading-relaxed text-subtext0">{children}</p>;
   },
-};
+});
 
 async function getPost(slug: string) {
   const markdownFile = fs.readFileSync(
@@ -299,7 +298,7 @@ export default async function Post({ params }: Props) {
                       format: 'mdx'
                     }
                   }}
-                  components={mdxComponents}
+                  components={mdxComponents(resolvedParams)}
                 />
               </div>
             </article>
