@@ -199,10 +199,9 @@ type Props = {
   params: {
     slug: string;
   };
-  searchParams?: { [key: string]: string | string[] | undefined };
 };
 
-export default async function Post({ params, searchParams }: Props) {
+export default async function Post({ params }: Props) {
   const { frontmatter, content } = await getPost(params.slug);
   const formattedDate = new Date(frontmatter.date).toLocaleDateString('en-US', {
     year: 'numeric',
