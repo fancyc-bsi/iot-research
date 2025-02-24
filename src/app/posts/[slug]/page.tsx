@@ -195,13 +195,11 @@ export async function generateStaticParams() {
 }
 
 // Correct props type for a Next.js App Router page component
-type Props = {
-  params: {
-    slug: string;
-  };
-};
-
-export default async function Post({ params }: Props) {
+export default async function Post({
+  params,
+}: {
+  params: { slug: string }
+}) {
   const { frontmatter, content } = await getPost(params.slug);
   const formattedDate = new Date(frontmatter.date).toLocaleDateString('en-US', {
     year: 'numeric',
