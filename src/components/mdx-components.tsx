@@ -1,12 +1,9 @@
-"use client";
-
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { MDXRemote } from 'next-mdx-remote/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
 import React from 'react';
-import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import TableOfContents from '@/components/TableOfContents';
 import type { BundledLanguage } from 'shiki';
@@ -80,12 +77,9 @@ const parseImageContent = (content: string): ImageData => {
   };
 };
 
-const ObsidianImage = ({ content, postSlug }: { content: string; postSlug?: string }) => {
-  const pathname = usePathname();
-  const slug = postSlug || pathname.split('/').pop();
-
+const ObsidianImage = ({ content, postSlug }: { content: string; postSlug: string }) => {
   const { imageName, caption } = parseImageContent(content);
-  const imagePath = `/iot-research/images/posts/${slug}/${imageName}`;
+  const imagePath = `/iot-research/images/posts/${postSlug}/${imageName}`;
 
   return (
     <figure className="my-8 flex flex-col items-center">
@@ -123,7 +117,7 @@ const ImageContainer = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-export const mdxComponents = (resolvedParams: { slug: string }) => ({
+export const mdxComponents = (slug: string) => ({
   h1: ({ children }: HeadingProps) => {
     const id = slugify(children?.toString() || '');
     return (
@@ -151,7 +145,7 @@ export const mdxComponents = (resolvedParams: { slug: string }) => ({
   p: ({ children }: ParagraphProps) => {
     if (typeof children === 'string') {
       if (children.startsWith('![[')) {
-        return <ObsidianImage content={children} postSlug={resolvedParams.slug} />;
+        return <ObsidianImage content={children} postSlug={slug} />;
       }
       return <p className="my-6 leading-relaxed text-subtext0">{children}</p>;
     }
@@ -165,7 +159,7 @@ export const mdxComponents = (resolvedParams: { slug: string }) => ({
           <ImageContainer>
             {children.map((child, index) => {
               if (typeof child === 'string' && child.startsWith('![[')) {
-                return <ObsidianImage key={index} content={child} postSlug={resolvedParams.slug} />;
+                return <ObsidianImage key={index} content={child} postSlug={slug} />;
               }
               return child;
             })}
@@ -198,15 +192,14 @@ export async function generateStaticParams() {
 }
 
 type Props = {
-  params: Promise<{
+  params: {
     slug: string;
-  }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  };
+  searchParams: { [key: string]: string | string[] | undefined };
 };
 
 export default async function Post({ params }: Props) {
-  const resolvedParams = await params;
-  const { frontmatter, content } = await getPost(resolvedParams.slug);
+  const { frontmatter, content } = await getPost(params.slug);
   const formattedDate = new Date(frontmatter.date).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -300,7 +293,7 @@ export default async function Post({ params }: Props) {
                       format: 'mdx'
                     }
                   }}
-                  components={mdxComponents(resolvedParams)}
+                  components={mdxComponents(params.slug)}
                 />
               </div>
             </article>
