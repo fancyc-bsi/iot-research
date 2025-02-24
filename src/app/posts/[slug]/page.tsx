@@ -3,8 +3,9 @@ import path from 'path';
 import matter from 'gray-matter';
 import { MDXRemote } from 'next-mdx-remote/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
+import React from 'react';
+import Image from 'next/image';
 import TableOfContents from '@/components/TableOfContents';
-import { mdxComponents } from '@/components/mdx-components';
 import type { BundledLanguage } from 'shiki';
 
 interface Frontmatter {
@@ -19,6 +20,20 @@ interface VisitedNode {
     className?: string[];
   };
 }
+
+interface HeadingProps {
+  children: React.ReactNode;
+}
+
+interface ParagraphProps {
+  children: React.ReactNode | React.ReactNode[];
+}
+
+const slugify = (str: string) =>
+  str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
 
 const rehypeOptions = {
   theme: 'catppuccin-mocha',
@@ -47,6 +62,119 @@ const rehypeOptions = {
   },
 };
 
+interface ImageData {
+  imageName: string;
+  caption?: string;
+}
+
+const parseImageContent = (content: string): ImageData => {
+  const imageMatch = content.match(/!\[\[(.*?)\]\](?:\(caption: (.*?)\))?/);
+  if (!imageMatch) return { imageName: '' };
+
+  return {
+    imageName: imageMatch[1],
+    caption: imageMatch[2]
+  };
+};
+
+// Define a factory function to create components rather than exporting directly
+const createMdxComponents = (slug: string) => {
+  const ObsidianImage = ({ content }: { content: string }) => {
+    const { imageName, caption } = parseImageContent(content);
+    const imagePath = `/iot-research/images/posts/${slug}/${imageName}`;
+
+    return (
+      <figure className="my-8 flex flex-col items-center">
+        <div className="relative w-full max-h-[800px] bg-mantle/50 rounded-lg flex justify-center">
+          <div className="relative min-h-[200px] w-full flex justify-center items-center">
+            <Image
+              src={imagePath}
+              alt={caption || imageName.split('-').join(' ')}
+              fill
+              className="object-contain rounded-lg"
+              quality={100}
+              loading="lazy"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 50vw"
+              style={{
+                maxHeight: '800px',
+                width: 'auto',
+                height: 'auto',
+                position: 'relative'
+              }}
+            />
+          </div>
+        </div>
+        {caption && (
+          <figcaption className="mt-4 text-sm text-subtext0 italic">
+            {caption}
+          </figcaption>
+        )}
+      </figure>
+    );
+  };
+
+  const ImageContainer = ({ children }: { children: React.ReactNode }) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
+      {children}
+    </div>
+  );
+
+  return {
+    h1: ({ children }: HeadingProps) => {
+      const id = slugify(children?.toString() || '');
+      return (
+        <h1 id={id} className="scroll-mt-24 text-3xl font-bold mt-12 mb-6 text-text">
+          {children}
+        </h1>
+      );
+    },
+    h2: ({ children }: HeadingProps) => {
+      const id = slugify(children?.toString() || '');
+      return (
+        <h2 id={id} className="scroll-mt-24 text-2xl font-bold mt-10 mb-4 text-text">
+          {children}
+        </h2>
+      );
+    },
+    h3: ({ children }: HeadingProps) => {
+      const id = slugify(children?.toString() || '');
+      return (
+        <h3 id={id} className="scroll-mt-24 text-xl font-bold mt-8 mb-3 text-text">
+          {children}
+        </h3>
+      );
+    },
+    p: ({ children }: ParagraphProps) => {
+      if (typeof children === 'string') {
+        if (children.startsWith('![[')) {
+          return <ObsidianImage content={children} />;
+        }
+        return <p className="my-6 leading-relaxed text-subtext0">{children}</p>;
+      }
+
+      if (Array.isArray(children)) {
+        const hasOnlyImages = children.every(
+          child => typeof child === 'string' && child.startsWith('![[')
+        );
+        if (hasOnlyImages) {
+          return (
+            <ImageContainer>
+              {children.map((child, index) => {
+                if (typeof child === 'string' && child.startsWith('![[')) {
+                  return <ObsidianImage key={index} content={child} />;
+                }
+                return child;
+              })}
+            </ImageContainer>
+          );
+        }
+      }
+
+      return <p className="my-6 leading-relaxed text-subtext0">{children}</p>;
+    },
+  };
+};
+
 async function getPost(slug: string) {
   const markdownFile = fs.readFileSync(
     path.join(process.cwd(), 'src/content/posts', slug + '.mdx'),
@@ -67,27 +195,29 @@ export async function generateStaticParams() {
 }
 
 type Props = {
-  params: Promise<{
+  params: {
     slug: string;
-  }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  };
+  searchParams: { [key: string]: string | string[] | undefined };
 };
 
 export default async function Post({ params }: Props) {
-  const resolvedParams = await params;
-  const { frontmatter, content } = await getPost(resolvedParams.slug);
+  const { frontmatter, content } = await getPost(params.slug);
   const formattedDate = new Date(frontmatter.date).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
   });
 
+  // Create the components with the current slug
+  const mdxComponents = createMdxComponents(params.slug);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-base to-mantle">
       {/* Header Banner */}
       <div className="w-full bg-surface0/10 border-b border-surface0/50">
-        <div className="max-w-[1600px] mx-auto px-6 py-12 lg:py-16">
-          <h1 className="text-4xl lg:text-5xl xl:text-6xl font-bold text-text mb-6 leading-tight">
+        <div className="max-w-[1600px] mx-auto px-6 py-12">
+          <h1 className="text-4xl lg:text-5xl font-bold text-text mb-6 leading-tight">
             {frontmatter.title}
           </h1>
           <div className="flex flex-wrap items-center gap-4">
@@ -103,103 +233,77 @@ export default async function Post({ params }: Props) {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row">
-      <aside className="hidden lg:block w-[500px] sticky top-16 h-[calc(100vh-4rem)] shrink-0 overflow-y-auto border-r border-surface0/50 p-6">
-        <TableOfContents content={content} />
-      </aside>
-
-        {/* Main Content */}
-        {/* <main className="flex-1 min-w-0"> */}
-        <main className="flex-1 px-6 py-12">
-          <article className="max-w-6xl mx-auto px-6 lg:px-8 py-12">
-            <div className="prose prose-invert prose-lg max-w-none 
-              prose-headings:text-text 
-              prose-headings:font-semibold
-              prose-headings:scroll-mt-20
-              prose-h1:text-4xl
-              prose-h1:mt-20
-              prose-h1:mb-10
-              prose-h2:text-3xl
-              prose-h2:mt-16
-              prose-h2:mb-8
-              prose-h3:text-2xl
-              prose-h3:mt-12
-              prose-h3:mb-6
-              prose-p:text-subtext0 
-              prose-p:leading-7
-              prose-p:text-lg
-              prose-p:my-6
-              prose-a:text-blue 
-              prose-a:no-underline
-              prose-a:border-b
-              prose-a:border-blue/30
-              hover:prose-a:border-blue
-              hover:prose-a:text-sapphire
-              prose-strong:text-mauve
-              prose-strong:font-semibold
-              prose-code:text-peach
-              prose-pre:my-10
-              prose-pre:bg-mantle
-              prose-pre:border
-              prose-pre:border-surface0/50
-              prose-pre:rounded-xl
-              prose-pre:shadow-lg
-              prose-img:rounded-xl
-              prose-img:shadow-lg
-              prose-img:border
-              prose-img:border-surface0/50
-              prose-img:my-10
-              prose-figcaption:text-center
-              prose-figcaption:text-base
-              prose-figcaption:text-subtext0
-              prose-figcaption:mt-4
-              [&>*:first-child]:mt-0
-              [&>pre]:p-8
-              [&>:not(pre)>code]:px-2
-              [&>:not(pre)>code]:py-1
-              [&>:not(pre)>code]:rounded-md
-              [&>:not(pre)>code]:bg-surface0/40
-              [&>hr]:my-12
-              [&>hr]:border-surface0/50
-              [&>blockquote]:border-l-4
-              [&>blockquote]:border-blue
-              [&>blockquote]:bg-surface0/10
-              [&>blockquote]:px-8
-              [&>blockquote]:py-6
-              [&>blockquote]:rounded-r-xl
-              [&>blockquote]:not-italic
-              [&>blockquote]:shadow-sm
-              [&>table]:border-collapse
-              [&>table]:w-full
-              [&>table]:my-8
-              [&>table>thead>tr>th]:bg-surface0/30
-              [&>table>thead>tr>th]:p-3
-              [&>table>tbody>tr>td]:border
-              [&>table>tbody>tr>td]:border-surface0/50
-              [&>table>tbody>tr>td]:p-3
-              [&>ul]:pl-2
-              [&>ol]:pl-2
-              [&>ul>li]:mb-3
-              [&>ol>li]:mb-3">
-              <MDXRemote
-                source={content}
-                options={{
-                  mdxOptions: {
-                    remarkPlugins: [],
-                    rehypePlugins: [[rehypePrettyCode, rehypeOptions]],
-                    format: 'mdx'
-                  }
-                }}
-                components={mdxComponents}
-              />
+      <div className="max-w-[1600px] mx-auto">
+        <div className="flex flex-col lg:flex-row">
+          {/* Sidebar */}
+          <aside className="hidden lg:block w-72 h-[calc(100vh-4rem)] sticky top-16 shrink-0 overflow-y-auto border-r border-surface0/50">
+            <div className="p-8">
+              <h2 className="text-lg font-semibold text-text mb-6">Table of Contents</h2>
+              <TableOfContents content={content} />
             </div>
-          </article>
-        </main>
+          </aside>
 
-        {/* Right Sidebar - For additional content */}
-        <div className="hidden 2xl:block w-72 h-[calc(100vh-4rem)] sticky top-16 shrink-0 overflow-y-auto border-l border-surface0/50">
-          <div className="p-8">
-          </div>
+          {/* Main Content */}
+          <main className="flex-1 min-w-0">
+            <article className="max-w-4xl mx-auto px-6 lg:px-16 py-12">
+              <div className="prose prose-invert prose-lg max-w-none 
+                prose-headings:text-text 
+                prose-headings:font-semibold
+                prose-headings:scroll-mt-20
+                prose-p:text-subtext0 
+                prose-p:leading-7
+                prose-p:my-6
+                prose-a:text-blue 
+                prose-a:no-underline
+                prose-a:border-b
+                prose-a:border-blue/30
+                hover:prose-a:border-blue
+                prose-strong:text-mauve
+                prose-strong:font-semibold
+                prose-code:text-peach
+                prose-pre:bg-mantle
+                prose-pre:border
+                prose-pre:border-surface0/50
+                prose-pre:rounded-xl
+                prose-pre:shadow-lg
+                prose-pre:my-8
+                [&>*:first-child]:mt-0
+                [&>pre]:p-6
+                [&>:not(pre)>code]:px-2
+                [&>:not(pre)>code]:py-1
+                [&>:not(pre)>code]:rounded-md
+                [&>:not(pre)>code]:bg-surface0/40
+                [&>hr]:my-12
+                [&>hr]:border-surface0/50
+                [&>blockquote]:border-l-4
+                [&>blockquote]:border-blue
+                [&>blockquote]:bg-surface0/10
+                [&>blockquote]:px-8
+                [&>blockquote]:py-6
+                [&>blockquote]:rounded-r-xl
+                [&>blockquote]:shadow-sm
+                [&>table]:border-collapse
+                [&>table]:w-full
+                [&>table]:my-8
+                [&>table>thead>tr>th]:bg-surface0/30
+                [&>table>thead>tr>th]:p-3
+                [&>table>tbody>tr>td]:border
+                [&>table>tbody>tr>td]:border-surface0/50
+                [&>table>tbody>tr>td]:p-3">
+                <MDXRemote
+                  source={content}
+                  options={{
+                    mdxOptions: {
+                      remarkPlugins: [],
+                      rehypePlugins: [[rehypePrettyCode, rehypeOptions]],
+                      format: 'mdx'
+                    }
+                  }}
+                  components={mdxComponents}
+                />
+              </div>
+            </article>
+          </main>
         </div>
       </div>
     </div>
