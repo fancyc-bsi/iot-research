@@ -1,3 +1,4 @@
+// Updated page.tsx with correct Next.js App Router typing
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
@@ -77,103 +78,100 @@ const parseImageContent = (content: string): ImageData => {
   };
 };
 
-// Define a factory function to create components rather than exporting directly
-const createMdxComponents = (slug: string) => {
-  const ObsidianImage = ({ content }: { content: string }) => {
-    const { imageName, caption } = parseImageContent(content);
-    const imagePath = `/iot-research/images/posts/${slug}/${imageName}`;
+const ObsidianImage = ({ content, postSlug }: { content: string; postSlug: string }) => {
+  const { imageName, caption } = parseImageContent(content);
+  const imagePath = `/iot-research/images/posts/${postSlug}/${imageName}`;
 
-    return (
-      <figure className="my-8 flex flex-col items-center">
-        <div className="relative w-full max-h-[800px] bg-mantle/50 rounded-lg flex justify-center">
-          <div className="relative min-h-[200px] w-full flex justify-center items-center">
-            <Image
-              src={imagePath}
-              alt={caption || imageName.split('-').join(' ')}
-              fill
-              className="object-contain rounded-lg"
-              quality={100}
-              loading="lazy"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 50vw"
-              style={{
-                maxHeight: '800px',
-                width: 'auto',
-                height: 'auto',
-                position: 'relative'
-              }}
-            />
-          </div>
+  return (
+    <figure className="my-8 flex flex-col items-center">
+      <div className="relative w-full max-h-[800px] bg-mantle/50 rounded-lg flex justify-center">
+        <div className="relative min-h-[200px] w-full flex justify-center items-center">
+          <Image
+            src={imagePath}
+            alt={caption || imageName.split('-').join(' ')}
+            fill
+            className="object-contain rounded-lg"
+            quality={100}
+            loading="lazy"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 50vw"
+            style={{
+              maxHeight: '800px',
+              width: 'auto',
+              height: 'auto',
+              position: 'relative'
+            }}
+          />
         </div>
-        {caption && (
-          <figcaption className="mt-4 text-sm text-subtext0 italic">
-            {caption}
-          </figcaption>
-        )}
-      </figure>
-    );
-  };
-
-  const ImageContainer = ({ children }: { children: React.ReactNode }) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
-      {children}
-    </div>
+      </div>
+      {caption && (
+        <figcaption className="mt-4 text-sm text-subtext0 italic">
+          {caption}
+        </figcaption>
+      )}
+    </figure>
   );
-
-  return {
-    h1: ({ children }: HeadingProps) => {
-      const id = slugify(children?.toString() || '');
-      return (
-        <h1 id={id} className="scroll-mt-24 text-3xl font-bold mt-12 mb-6 text-text">
-          {children}
-        </h1>
-      );
-    },
-    h2: ({ children }: HeadingProps) => {
-      const id = slugify(children?.toString() || '');
-      return (
-        <h2 id={id} className="scroll-mt-24 text-2xl font-bold mt-10 mb-4 text-text">
-          {children}
-        </h2>
-      );
-    },
-    h3: ({ children }: HeadingProps) => {
-      const id = slugify(children?.toString() || '');
-      return (
-        <h3 id={id} className="scroll-mt-24 text-xl font-bold mt-8 mb-3 text-text">
-          {children}
-        </h3>
-      );
-    },
-    p: ({ children }: ParagraphProps) => {
-      if (typeof children === 'string') {
-        if (children.startsWith('![[')) {
-          return <ObsidianImage content={children} />;
-        }
-        return <p className="my-6 leading-relaxed text-subtext0">{children}</p>;
-      }
-
-      if (Array.isArray(children)) {
-        const hasOnlyImages = children.every(
-          child => typeof child === 'string' && child.startsWith('![[')
-        );
-        if (hasOnlyImages) {
-          return (
-            <ImageContainer>
-              {children.map((child, index) => {
-                if (typeof child === 'string' && child.startsWith('![[')) {
-                  return <ObsidianImage key={index} content={child} />;
-                }
-                return child;
-              })}
-            </ImageContainer>
-          );
-        }
-      }
-
-      return <p className="my-6 leading-relaxed text-subtext0">{children}</p>;
-    },
-  };
 };
+
+const ImageContainer = ({ children }: { children: React.ReactNode }) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
+    {children}
+  </div>
+);
+
+const mdxComponents = (slug: string) => ({
+  h1: ({ children }: HeadingProps) => {
+    const id = slugify(children?.toString() || '');
+    return (
+      <h1 id={id} className="scroll-mt-24 text-3xl font-bold mt-12 mb-6 text-text">
+        {children}
+      </h1>
+    );
+  },
+  h2: ({ children }: HeadingProps) => {
+    const id = slugify(children?.toString() || '');
+    return (
+      <h2 id={id} className="scroll-mt-24 text-2xl font-bold mt-10 mb-4 text-text">
+        {children}
+      </h2>
+    );
+  },
+  h3: ({ children }: HeadingProps) => {
+    const id = slugify(children?.toString() || '');
+    return (
+      <h3 id={id} className="scroll-mt-24 text-xl font-bold mt-8 mb-3 text-text">
+        {children}
+      </h3>
+    );
+  },
+  p: ({ children }: ParagraphProps) => {
+    if (typeof children === 'string') {
+      if (children.startsWith('![[')) {
+        return <ObsidianImage content={children} postSlug={slug} />;
+      }
+      return <p className="my-6 leading-relaxed text-subtext0">{children}</p>;
+    }
+
+    if (Array.isArray(children)) {
+      const hasOnlyImages = children.every(
+        child => typeof child === 'string' && child.startsWith('![[')
+      );
+      if (hasOnlyImages) {
+        return (
+          <ImageContainer>
+            {children.map((child, index) => {
+              if (typeof child === 'string' && child.startsWith('![[')) {
+                return <ObsidianImage key={index} content={child} postSlug={slug} />;
+              }
+              return child;
+            })}
+          </ImageContainer>
+        );
+      }
+    }
+
+    return <p className="my-6 leading-relaxed text-subtext0">{children}</p>;
+  },
+});
 
 async function getPost(slug: string) {
   const markdownFile = fs.readFileSync(
@@ -194,17 +192,18 @@ export async function generateStaticParams() {
   }));
 }
 
-// Correct props type for a Next.js App Router page component
-export default async function Post({ params }: { params: { slug: string } }) {
+// FIX: Correct type definition for Next.js App Router page component
+export default async function Post({
+  params,
+}: {
+  params: { slug: string };
+}) {
   const { frontmatter, content } = await getPost(params.slug);
   const formattedDate = new Date(frontmatter.date).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
   });
-
-  // Create the components with the current slug
-  const mdxComponents = createMdxComponents(params.slug);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-base to-mantle">
@@ -293,7 +292,7 @@ export default async function Post({ params }: { params: { slug: string } }) {
                       format: 'mdx'
                     }
                   }}
-                  components={mdxComponents}
+                  components={mdxComponents(params.slug)}
                 />
               </div>
             </article>
