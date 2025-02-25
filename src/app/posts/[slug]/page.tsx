@@ -9,9 +9,12 @@ import Image from 'next/image';
 import TableOfContents from '@/components/TableOfContents';
 import type { BundledLanguage } from 'shiki';
 
-// Instead of using complex typings, we'll use simple interfaces
-interface PostParams {
-  slug: string;
+// Define proper types to avoid using 'any'
+interface PostPageProps {
+  params: {
+    slug: string;
+  };
+  searchParams?: Record<string, string | string[] | undefined>;
 }
 
 interface Frontmatter {
@@ -191,17 +194,20 @@ async function getPost(slug: string) {
   };
 }
 
-// Critical for static exports - this tells Next.js which pages to generate
-export async function generateStaticParams(): Promise<PostParams[]> {
+// For static export - generate all possible paths
+export async function generateStaticParams() {
   const files = fs.readdirSync(path.join(process.cwd(), 'src/content/posts'));
   return files.map((filename) => ({
     slug: filename.replace('.mdx', ''),
   }));
 }
 
-// Use a simpler function signature with 'as any' to bypass typing issues
-const Post = async (props: any) => {
-  const slug = props.params.slug;
+// Use type assertion with a specific type instead of 'any'
+type PageComponent = (props: PostPageProps) => Promise<JSX.Element>;
+
+// Define the component with proper typing
+const Post: PageComponent = async ({ params }) => {
+  const { slug } = params;
   const { frontmatter, content } = await getPost(slug);
   const formattedDate = new Date(frontmatter.date).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -307,4 +313,5 @@ const Post = async (props: any) => {
   );
 };
 
-export default Post as any;
+// Use a more specific type assertion
+export default Post as unknown as React.ComponentType;
