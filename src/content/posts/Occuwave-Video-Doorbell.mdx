@@ -139,8 +139,10 @@ We pull it from the device for binary analysis. This concludes our initial recon
 
 Another reminder to always wipe your devices before getting rid of them.
 
-Looks like at the very least our username for the mobile app isn't being stored on the device 
+Looks like at the very least our username for the mobile app isn't being stored on the device
+
 ![[Pasted image 20250216180043.png]]
+
 Nothing really sticking out other than custom binaries that we will reverse engineer in the next section. 
 
 # Binary Analysis
@@ -170,6 +172,7 @@ Looks like the device is storing and uploading screenshots, but we don't have th
 ![[Pasted image 20250203223146.png]]
 
 We intercept the request and see if we have a cookie set or jwt 
+
 ![[Pasted image 20250203223909.png]]
 
 Now lets see if we can use that header to view the jpg
