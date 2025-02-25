@@ -192,13 +192,27 @@ export async function generateStaticParams() {
   }));
 }
 
-// FIX: Correct type definition for Next.js App Router page component
-export default async function Post({
-  params,
-}: {
+// APPROACH 1: Use more general typing from Next.js
+import { Metadata } from 'next';
+import { NextPage } from 'next';
+
+type Props = {
   params: { slug: string };
-}) {
-  const { frontmatter, content } = await getPost(params.slug);
+  searchParams?: { [key: string]: string | string[] | undefined };
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { frontmatter } = await getPost(params.slug);
+  return {
+    title: frontmatter.title,
+    description: frontmatter.excerpt,
+  };
+}
+
+// APPROACH 2: Define the page component using NextPage
+const Post: NextPage<Props> = async (props) => {
+  const { slug } = props.params;
+  const { frontmatter, content } = await getPost(slug);
   const formattedDate = new Date(frontmatter.date).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -292,7 +306,7 @@ export default async function Post({
                       format: 'mdx'
                     }
                   }}
-                  components={mdxComponents(params.slug)}
+                  components={mdxComponents(slug)}
                 />
               </div>
             </article>
@@ -301,4 +315,6 @@ export default async function Post({
       </div>
     </div>
   );
-}
+};
+
+export default Post;
