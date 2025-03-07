@@ -16,7 +16,7 @@ A quick rundown of the methodology used in this article:
 - Reviewing network communications from/to the device 
 - Inspecting open ports
 - Review cloud server traffic 
-- Attempt to reverse engineer critical binaries
+- Attempt to reverse engineer critical binaries (coming soon)
 - Bypass SSL pinning or integrity checks on the mobile app to view cleartext traffic
 
 # Serial Connection
@@ -130,9 +130,6 @@ We pull it from the device for binary analysis. This concludes our initial recon
 
 # Firmware Analysis 
 
-#fixme intro about how i got the firmware
-
-
 ![[Pasted image 20250216173756.png]]
 
 ![[Pasted image 20250216175720.png]]
@@ -147,8 +144,8 @@ Nothing really sticking out other than custom binaries that we will reverse engi
 
 # Binary Analysis
 
-We will be exploring the "ciapp" application and how it functions, using ghidra. 
-#fixme 
+We will be exploring the "ciapp" application and how it functions, using ghidra. This section is a work in progress and will be updated soon.
+
 # Pairing the Device 
 
 We pair the device successfully and monitor the traffic in wireshark, nothing out of the ordinary here, using bluetooth to find the device and then prompts you for your wifi network credentials. Within the app on my rooted android device you can view the live video feed, without initializing this connection, the device appears to be in a constant state of rebooting. So we boot up mitmproxy and see if we can intercept any traffic before trying to inject our own.
