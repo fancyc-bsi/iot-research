@@ -130,7 +130,13 @@ We pull it from the device for binary analysis. This concludes our initial recon
 
 # Firmware Analysis 
 
+I removed the flash chip off the board with my hot air gun, from there I used my universial programmer to read the contents of the flash chip.
+
+Below is the extraction of the firmware using binwalk.
+
 ![[Pasted image 20250216173756.png]]
+
+Looking around for some interesting files, we see that our network info we paired the device on is stored in clear. 
 
 ![[Pasted image 20250216175720.png]]
 
