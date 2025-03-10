@@ -319,10 +319,15 @@ focusing more on that cmd port lets try to generate a random UUID and use that
 
 ![[Pasted image 20250206190017.png]]
 
-seems like we need a valid login, but this time our command is at least reflected in the response.
+seems like we need a valid login, I tried using the account we created during the pairing of the device with no luck. 
+
 # SSL Pinning Bypass - Mobile app
 
-#fixme mobile app info
+Their mobile app is called "Seeing", it's filled with external ads and pushes you to subscribe to their cloud storage.
+
+As we proved above, regardless of if you pay for their cloud storage, the device will take occasional screenshots and store on their cloud servers.
+
+In this section we will be attempting to intercept the coms between the mobile app and connected cloud servers or directly to the doorbell itself.
 
 ![[Pasted image 20250203202115.png]]
 
@@ -388,6 +393,6 @@ Sadly no data was populated within these database files.
 
 # Conclusion
 
-This device followed very poor security practices, from not checking certificates to storing photos on their cloud servers without any authentication. This device is a prime example of why you should always wipe your devices before getting rid of them.
+This device followed very poor security practices, from not checking certificates to storing photos on their cloud servers without the user knowing. This device is a prime example of why you should always wipe your devices before getting rid of them.
 Furthermore, the mobile app was not storing any sensitive information locally, but still allowed for easy bypass of SSL pinning.
-Lastly, the root password was easily cracked and the device was running an outdated version of openWRT.
+Lastly, the root password was easily cracked and the device was running an outdated version of openWRT, a root shell was obtained instantly due to no login prompt.
